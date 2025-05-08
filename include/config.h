@@ -33,9 +33,9 @@
     #define I2C_SCL_PIN 22             // I2C SCL pin
 #endif
 
-#ifdef USE_BMP280
+/* #ifdef USE_BMP280
     #define BMP280_ADDRESS 0x76        // Default BMP280 I2C address (some modules use 0x77)
-#endif
+#endif */
 
 // Configuração BLE
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
