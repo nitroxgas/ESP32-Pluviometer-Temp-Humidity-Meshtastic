@@ -447,22 +447,14 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   
   IPAddress host;
   if (host.fromString(config->meshtasticNodeIP)) {
-    // Tente fazer ping no host antes de tentar conectar
-    if (WiFi.ping(host) > 0) {
-      Serial.println("Host respondeu ao ping, acessível!");
+    // Tentar conexão TCP direta para verificar acessibilidade
+    WiFiClient client;
+    if (client.connect(config->meshtasticNodeIP, config->meshtasticNodePort)) {
+      Serial.println("Conexão TCP bem-sucedida, host está acessível!");
+      client.stop();
       hostReachable = true;
     } else {
-      Serial.println("Host não respondeu ao ping, verificando conexão TCP...");
-      
-      // Tentar conexão TCP direta
-      WiFiClient client;
-      if (client.connect(config->meshtasticNodeIP, config->meshtasticNodePort)) {
-        Serial.println("Conexão TCP bem-sucedida, host está acessível!");
-        client.stop();
-        hostReachable = true;
-      } else {
-        Serial.println("Falha na conexão TCP. Host inacessível.");
-      }
+      Serial.println("Falha na conexão TCP. Host inacessível.");
     }
   } else {
     Serial.println("Endereço IP inválido!");

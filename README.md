@@ -130,7 +130,7 @@ Observe que o código será compilado apenas com as partes relevantes para os se
 - Se os dados não estiverem sendo recebidos pelo nó Meshtastic:
   - Verifique o endereço IP do nó Meshtastic usando o portal de configuração
   - Certifique-se que o ESP32 e o nó Meshtastic estão na mesma rede WiFi
-  - Verifique se o nó Meshtastic está acessível (teste com ping ou conexão TCP)
+  - Verifique se o nó Meshtastic está acessível (o código testa com conexão TCP)
   - Confirme que o nó Meshtastic tem a API HTTP habilitada (nas configurações do Meshtastic)
   - O sistema verifica a conectividade com o nó antes de tentar enviar mensagens
   - Os erros de conexão são registrados no console serial para diagnóstico
