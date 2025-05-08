@@ -5,9 +5,9 @@
 #define DEFAULT_DEEP_SLEEP_TIME_MINUTES 5    // Deep sleep duration in minutes
 #define DEFAULT_CPU_FREQ_MHZ 160             // CPU frequency in MHz (80 or 160 for ESP32)
 #define DEFAULT_RAIN_MM_PER_TIP 0.25         // Rain gauge produces 0.25mm per tip/interrupt
-#define DEFAULT_WIFI_SSID "GeorgeHome"        // WiFi SSID
-#define DEFAULT_WIFI_PASSWORD "Cz1mwyh." // WiFi password
-#define DEFAULT_MESHTASTIC_NODE_IP "192.168.1.98"  // IP address of Meshtastic node
+#define DEFAULT_WIFI_SSID "your_wifi_ssid"        // WiFi SSID
+#define DEFAULT_WIFI_PASSWORD "your_wifi_password" // WiFi password
+#define DEFAULT_MESHTASTIC_NODE_IP "192.168.1.100"  // IP address of Meshtastic node
 #define DEFAULT_MESHTASTIC_NODE_PORT 80             // Port of Meshtastic node
 #define DEFAULT_DEVICE_NAME "ESP32-Weather"        // Nome do dispositivo para BLE
 
@@ -15,7 +15,7 @@
 #define MAX_RUNTIME_MS 30000         // Maximum runtime before forced sleep (30 seconds)
 #define uS_TO_MIN_FACTOR 60000000ULL // Conversion factor: microseconds to minutes
 #define WIFI_TIMEOUT 20000           // WiFi connection timeout in milliseconds
-#define MESHTASTIC_API_ENDPOINT "/api/v1/sendtext"  // Endpoint for sending data
+#define MESHTASTIC_API_ENDPOINT "/api/v1/messages"  // Endpoint for sending messages (REST API)
 #define CONFIG_AP_PASSWORD "weatherconfig"  // Senha do ponto de acesso no modo configuração
 #define CONFIG_PORTAL_TIMEOUT 180    // Tempo limite (em segundos) do portal de configuração
 

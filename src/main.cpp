@@ -361,49 +361,61 @@ bool readDHT22(float &temperature, float &humidity) {
 }
 #endif
 
-// Send data to Meshtastic node
+// Send data to Meshtastic node using the REST API
 void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   Serial.println("Preparing data for Meshtastic node...");
   
   // Get Meshtastic configuration
   WeatherStationConfig* config = configManager.getConfig();
   
-  // Create JSON document
-  StaticJsonDocument<256> doc;
+  // Create JSON document for the weather data
+  StaticJsonDocument<256> dataDoc;
   
   // Include temperature data
-  doc["temperature"] = temperature;
+  dataDoc["temperature"] = temperature;
   
   // Include sensor-specific data
   #ifdef USE_DHT22
-    doc["humidity"] = humidity;
-    doc["sensor"] = "DHT22";
+    dataDoc["humidity"] = humidity;
+    dataDoc["sensor"] = "DHT22";
   #endif
   
   // When both I2C sensors are used, we get more complete data
   #if defined(USE_AHT20) && defined(USE_BMP280)
-    doc["humidity"] = humidity;
+    dataDoc["humidity"] = humidity;
     float pressure = bmp.readPressure() / 100.0F; // Convert Pa to hPa
-    doc["pressure"] = pressure;
-    doc["sensor"] = "AHT20+BMP280";
+    dataDoc["pressure"] = pressure;
+    dataDoc["sensor"] = "AHT20+BMP280";
   #elif defined(USE_AHT20)
-    doc["humidity"] = humidity;
-    doc["sensor"] = "AHT20";
+    dataDoc["humidity"] = humidity;
+    dataDoc["sensor"] = "AHT20";
   #elif defined(USE_BMP280)
-    doc["pressure"] = bmp.readPressure() / 100.0F; // Convert Pa to hPa
-    doc["sensor"] = "BMP280";
+    dataDoc["pressure"] = bmp.readPressure() / 100.0F; // Convert Pa to hPa
+    dataDoc["sensor"] = "BMP280";
   #endif
   
-  // Include rain data and calibration
-  doc["rain"] = rainAmount;
-  doc["node_name"] = config->deviceName;
+  // Include rain data and node identification
+  dataDoc["rain"] = rainAmount;
+  dataDoc["node_name"] = config->deviceName;
   
-  // Serialize JSON to string
-  String jsonString;
-  serializeJson(doc, jsonString);
+  // Serialize weather data JSON to string
+  String dataString;
+  serializeJson(dataDoc, dataString);
   
-  Serial.print("JSON data: ");
-  Serial.println(jsonString);
+  Serial.print("Weather data: ");
+  Serial.println(dataString);
+  
+  // Create the message JSON according to Meshtastic REST API format
+  StaticJsonDocument<512> messageDoc;
+  
+  // Message parameters required by the Meshtastic API
+  messageDoc["channelId"] = 0; // Default channel (0)
+  messageDoc["text"] = dataString; // Our weather data as the message text
+  messageDoc["serviceId"] = "WEATHER_DATA"; // Custom service ID to identify our messages
+  
+  // Serialize the message JSON
+  String messageJson;
+  serializeJson(messageDoc, messageJson);
   
   // Send data to Meshtastic node
   Serial.println("Sending data to Meshtastic node...");
@@ -412,19 +424,28 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   String url = "http://" + String(config->meshtasticNodeIP) + ":" + 
                String(config->meshtasticNodePort) + MESHTASTIC_API_ENDPOINT;
   
-  Serial.print("Sending to: ");
+  Serial.print("Sending to URL: ");
   Serial.println(url);
+  Serial.print("Message payload: ");
+  Serial.println(messageJson);
   
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
   
-  int httpResponseCode = http.POST(jsonString);
+  // Send a POST request with our JSON message
+  int httpResponseCode = http.POST(messageJson);
   
   if (httpResponseCode > 0) {
     Serial.print("HTTP Response code: ");
     Serial.println(httpResponseCode);
     String payload = http.getString();
     Serial.println("Response: " + payload);
+    
+    if (httpResponseCode == 200) {
+      Serial.println("Message sent successfully to Meshtastic node!");
+    } else {
+      Serial.println("Unexpected response from Meshtastic node.");
+    }
   } else {
     Serial.print("Error on sending POST: ");
     Serial.println(httpResponseCode);
