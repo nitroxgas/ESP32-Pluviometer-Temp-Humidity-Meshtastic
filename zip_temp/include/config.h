@@ -7,30 +7,16 @@
 #define MAX_RUNTIME_MS 30000       // Maximum runtime before going to sleep (30 seconds)
 
 // Pin definitions
+#define DHT_PIN 4                  // DHT22 data pin
 #define RAIN_GAUGE_INTERRUPT_PIN 27 // Rain gauge interrupt pin (GPIO27)
 
-// Sensor pin definitions
-#ifdef USE_DHT22
-    #define DHT_PIN 4                  // DHT22 data pin
-#endif
-
-// I2C pin definitions (for AHT20 and BMP280)
-#if defined(USE_AHT20) || defined(USE_BMP280)
-    #define I2C_SDA_PIN 21             // I2C SDA pin
-    #define I2C_SCL_PIN 22             // I2C SCL pin
-#endif
-
-#ifdef USE_BMP280
-    #define BMP280_ADDRESS 0x76        // Default BMP280 I2C address (some modules use 0x77)
-#endif
-
 // WiFi configuration
-#define WIFI_SSID "GeorgeHome"        // WiFi SSID
-#define WIFI_PASSWORD "Cz1mwyh." // WiFi password
+#define WIFI_SSID "your_wifi_ssid"        // WiFi SSID
+#define WIFI_PASSWORD "your_wifi_password" // WiFi password
 #define WIFI_TIMEOUT 20000                // WiFi connection timeout in milliseconds
 
 // Meshtastic node configuration
-#define MESHTASTIC_NODE_IP "192.168.1.98"  // IP address of Meshtastic node
+#define MESHTASTIC_NODE_IP "192.168.1.100"  // IP address of Meshtastic node
 #define MESHTASTIC_NODE_PORT 80             // Port of Meshtastic node
 #define MESHTASTIC_API_ENDPOINT "/api/v1/sendtext"  // Endpoint for sending data
 

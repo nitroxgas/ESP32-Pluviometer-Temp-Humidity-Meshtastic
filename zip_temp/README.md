@@ -1,6 +1,6 @@
 # ESP32 Weather Station with Meshtastic Integration
 
-Este projeto implementa uma estação meteorológica com eficiência energética usando um microcontrolador ESP32. Ele suporta múltiplos sensores de temperatura/umidade/pressão (DHT22, AHT20, BMP280) e conta as basculadas do pluviômetro, depois envia esses dados para um nó Meshtastic via WiFi para propagação pela rede LoRa.
+Este projeto implementa uma estação meteorológica com eficiência energética usando um microcontrolador ESP32. Ele lê dados de temperatura e umidade de um sensor DHT22 e conta as basculadas do pluviômetro, depois envia esses dados para um nó Meshtastic via WiFi para propagação pela rede LoRa.
 
 ## Características
 
@@ -11,10 +11,7 @@ Este projeto implementa uma estação meteorológica com eficiência energética
 - Múltiplas fontes de wake-up:
   - Baseado em timer (leituras programadas regulares)
   - Baseado em interrupção (detecção imediata de chuva)
-- Suporte para diferentes sensores (configuráveis em tempo de compilação):
-  - DHT22 (temperatura e umidade)
-  - AHT20 (temperatura e umidade de alta precisão)
-  - BMP280 (temperatura e pressão barométrica)
+- Integração com sensor DHT22 para leituras de temperatura e umidade
 - Monitoramento de pluviômetro (0,25mm por basculada/interrupção)
 - Conectividade WiFi para nó Meshtastic
 - Transmissão de dados em formato JSON para propagação na rede LoRa
@@ -22,27 +19,18 @@ Este projeto implementa uma estação meteorológica com eficiência energética
 ## Requisitos de Hardware
 
 - Placa de desenvolvimento ESP32
-- Um dos seguintes sensores (conforme ambiente selecionado no PlatformIO):
-  - Sensor de temperatura e umidade DHT22
-  - Sensor de temperatura e umidade AHT20 (I2C)
-  - Sensor de temperatura e pressão BMP280 (I2C)
+- Sensor de temperatura e umidade DHT22
 - Pluviômetro com mecanismo de báscula
 - Fonte de energia (bateria recomendada)
 
 ## Conexões
 
-1. **Para o sensor DHT22:**
+1. **Sensor DHT22:**
    - Conecte VCC ao 3.3V
    - Conecte GND ao GND
    - Conecte DATA ao GPIO4 (ou altere DHT_PIN em config.h)
 
-2. **Para sensores I2C (AHT20 ou BMP280):**
-   - Conecte VCC ao 3.3V
-   - Conecte GND ao GND
-   - Conecte SDA ao GPIO21 (ou altere I2C_SDA_PIN em config.h)
-   - Conecte SCL ao GPIO22 (ou altere I2C_SCL_PIN em config.h)
-
-3. **Pluviômetro:**
+2. **Pluviômetro:**
    - Conecte um fio ao GND
    - Conecte o outro fio ao GPIO27 (ou altere RAIN_GAUGE_INTERRUPT_PIN em config.h)
    - Use um resistor pull-up externo (10kΩ) entre GPIO27 e 3.3V
@@ -66,12 +54,7 @@ Edite o arquivo `include/config.h` para personalizar:
 3. Abra a pasta do projeto no VSCode.
 4. O PlatformIO detectará automaticamente o projeto.
 5. Edite as configurações em `include/config.h`.
-6. Selecione o ambiente correto na barra inferior do VSCode:
-   - `dht22` - Para usar o sensor DHT22
-   - `i2c_sensors` - Para usar os sensores AHT20 e BMP280 juntos (temperatura, umidade e pressão)
-7. Clique em "Build" e depois em "Upload" na barra inferior do VSCode.
-
-Observe que o código será compilado apenas com as partes relevantes para os sensores selecionados, reduzindo o tamanho do binário final e otimizando o uso de memória. No ambiente `i2c_sensors`, o sistema utilizará o AHT20 para leituras de temperatura e umidade, e o BMP280 para leituras de pressão barométrica, fornecendo um conjunto mais completo de dados meteorológicos.
+6. Clique em "Build" e depois em "Upload" na barra inferior do VSCode.
 
 ## Considerações sobre Consumo de Energia
 
@@ -85,24 +68,12 @@ Observe que o código será compilado apenas com as partes relevantes para os se
 
 ## Solução de Problemas
 
-- Problemas com sensores:
-  - Se as leituras do DHT22 falharem, verifique as conexões do sensor
-  - Se as leituras do AHT20 ou BMP280 falharem:
-    - Verifique as conexões I2C (SDA e SCL)
-    - Confirme se o endereço I2C do BMP280 está correto (0x76 padrão, alguns usam 0x77)
-    - Verifique se os resistores pull-up estão presentes nos pinos I2C (4.7kΩ recomendados)
-    - Certifique-se de que apenas um sensor está conectado ao barramento I2C durante os testes iniciais
-
+- Se as leituras do DHT22 falharem, verifique as conexões do sensor
 - Se a conexão WiFi falhar, verifique suas credenciais e a força do sinal
-
 - Se os dados não estiverem sendo recebidos pelo nó Meshtastic:
   - Verifique o endereço IP do nó Meshtastic
   - Verifique se o endpoint da API está correto
   - Certifique-se de que o nó Meshtastic esteja configurado corretamente para aceitar solicitações HTTP
-  
-- Para o ambiente `i2c_sensors`:
-  - Se somente um dos sensores for encontrado durante a inicialização, o código ainda funcionará com funcionalidade limitada
-  - Se preferir usar apenas um sensor I2C, você pode editar o arquivo platformio.ini para remover uma das flags de compilação
 
 ## Licença
 
