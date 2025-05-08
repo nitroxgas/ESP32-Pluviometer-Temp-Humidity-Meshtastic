@@ -139,16 +139,17 @@ Observe que o código será compilado apenas com as partes relevantes para os se
     - CONNECTION REFUSED (-1): o servidor está acessível mas recusou a conexão
     - NOT CONNECTED (-4): a conexão WiFi não está estabelecida
   - O sistema usa a API `/api/v1/toradio` com método PUT para enviar mensagens
-  - As mensagens são enviadas seguindo a estrutura ToRadio do protobuf Meshtastic:
-    - packet: objeto MeshPacket contendo:
+  - Implementação de Protocol Buffers (nanopb) para construir mensagens compatíveis
+  - As mensagens são estruturadas nativamente seguindo o formato Meshtastic:
+    - MeshPacket: estrutura nativa do tipo pacote mesh contendo:
       - from: 0 (usa o ID do próprio nó)
       - to: BROADCAST_ADDR (0xffffffff para broadcast)
       - id: um número aleatório para identificar a mensagem
-      - want_ack: definido como false para nosso caso
-      - priority: "RELIABLE" para garantir melhor transmissão
-      - decoded: objeto contendo:
-        - portnum: "TEXT_MESSAGE_APP" (porta 1 para mensagens de texto)
-        - payload: os dados meteorológicos em formato JSON
+      - want_ack: definido como false por não necessitar confirmação
+      - port: TEXT_MESSAGE_APP (porta 1) para mensagens de texto
+      - payload: estrutura DataPacket contendo os dados meteorológicos em JSON
+  - A biblioteca processa automaticamente a conversão entre estruturas nativas e JSON
+  - A estrutura interna garante compatibilidade com o formato esperado pelo Meshtastic
   - Verifique os logs do dispositivo Meshtastic para confirmar a recepção da mensagem
   - Se necessário, tente reiniciar o nó Meshtastic para garantir que a API HTTP esteja funcionando corretamente
   
