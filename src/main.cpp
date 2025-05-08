@@ -439,29 +439,89 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   Serial.print("ToRadio payload: ");
   Serial.println(toRadioJson);
   
-  http.begin(url);
-  http.addHeader("Content-Type", "application/json");
+  // Verificar se consegue conectar ao host Meshtastic
+  bool hostReachable = false;
   
-  // The toRadio endpoint uses PUT request
-  int httpResponseCode = http.PUT(toRadioJson);
+  Serial.print("Verificando conexão com o host Meshtastic: ");
+  Serial.println(config->meshtasticNodeIP);
   
-  if (httpResponseCode > 0) {
-    Serial.print("HTTP Response code: ");
-    Serial.println(httpResponseCode);
-    String payload = http.getString();
-    Serial.println("Response: " + payload);
-    
-    if (httpResponseCode == 200 || httpResponseCode == 204) {
-      Serial.println("Message sent successfully to Meshtastic node!");
+  IPAddress host;
+  if (host.fromString(config->meshtasticNodeIP)) {
+    // Tente fazer ping no host antes de tentar conectar
+    if (WiFi.ping(host) > 0) {
+      Serial.println("Host respondeu ao ping, acessível!");
+      hostReachable = true;
     } else {
-      Serial.println("Unexpected response from Meshtastic node.");
+      Serial.println("Host não respondeu ao ping, verificando conexão TCP...");
+      
+      // Tentar conexão TCP direta
+      WiFiClient client;
+      if (client.connect(config->meshtasticNodeIP, config->meshtasticNodePort)) {
+        Serial.println("Conexão TCP bem-sucedida, host está acessível!");
+        client.stop();
+        hostReachable = true;
+      } else {
+        Serial.println("Falha na conexão TCP. Host inacessível.");
+      }
     }
   } else {
-    Serial.print("Error on sending PUT: ");
-    Serial.println(httpResponseCode);
+    Serial.println("Endereço IP inválido!");
   }
   
-  http.end();
+  // Só tenta enviar se o host estiver acessível
+  int httpResponseCode = -1;
+  
+  if (hostReachable) {
+    // Configurar timeout de conexão maior
+    http.setConnectTimeout(10000); // 10 segundos
+    http.setTimeout(10000);        // 10 segundos para operações
+    
+    // Iniciar a conexão e enviar a requisição
+    if (http.begin(url)) {
+      http.addHeader("Content-Type", "application/json");
+    
+      // The toRadio endpoint uses PUT request
+      httpResponseCode = http.PUT(toRadioJson);
+      
+      if (httpResponseCode > 0) {
+        Serial.print("HTTP Response code: ");
+        Serial.println(httpResponseCode);
+        String payload = http.getString();
+        Serial.println("Response: " + payload);
+        
+        if (httpResponseCode == 200 || httpResponseCode == 204) {
+          Serial.println("Message sent successfully to Meshtastic node!");
+        } else {
+          Serial.println("Unexpected response from Meshtastic node.");
+        }
+      } else {
+        Serial.print("Error on sending PUT: ");
+        Serial.println(httpResponseCode);
+        // Exibir mais detalhes sobre o erro
+        switch (httpResponseCode) {
+          case -1: Serial.println("CONNECTION REFUSED"); break;
+          case -2: Serial.println("SEND HEADER FAILED"); break;
+          case -3: Serial.println("SEND PAYLOAD FAILED"); break;
+          case -4: Serial.println("NOT CONNECTED"); break;
+          case -5: Serial.println("CONNECTION LOST"); break;
+          case -6: Serial.println("NO STREAM"); break;
+          case -7: Serial.println("NO HTTP SERVER"); break;
+          case -8: Serial.println("TOO LESS RAM"); break;
+          case -9: Serial.println("ENCODING ERROR"); break;
+          case -10: Serial.println("STREAM WRITE ERROR"); break;
+          case -11: Serial.println("CONNECT FAIL"); break;
+          default: Serial.println("UNKNOWN ERROR"); break;
+        }
+      }
+      
+      http.end();
+    } else {
+      Serial.println("Falha ao iniciar conexão HTTP");
+    }
+  } else {
+    Serial.println("Não foi possível enviar dados - host Meshtastic inacessível");
+    Serial.println("Verifique o endereço IP e a porta do nó Meshtastic nas configurações");
+  }
 }
 
 // Configure deep sleep
