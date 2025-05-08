@@ -129,8 +129,10 @@ Observe que o código será compilado apenas com as partes relevantes para os se
 
 - Se os dados não estiverem sendo recebidos pelo nó Meshtastic:
   - Verifique o endereço IP do nó Meshtastic usando o portal de configuração
-  - Verifique se o endpoint da API está correto
-  - Certifique-se de que o nó Meshtastic esteja configurado corretamente para aceitar solicitações HTTP
+  - Confirme que o nó Meshtastic tem a API REST habilitada
+  - O sistema usa a API `/api/v1/messages` para enviar mensagens de texto
+  - O JSON de dados meteorológicos é enviado como texto no formato correto para a API REST Meshtastic
+  - Verifique os logs do dispositivo Meshtastic para confirmar a recepção da mensagem
   
 - Problemas com o modo de configuração:
   - Se o portal web não iniciar, pressione o botão RESET seguido do botão BOOT
