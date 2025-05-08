@@ -332,85 +332,45 @@ void ConfigManager::setupWebServer() {
   });
 }
 
-// Gera página HTML de configuração
+// Gera página HTML de configuração - versão otimizada para reduzir uso de memória
 String ConfigManager::generateConfigPage() {
-  String html = F("<!DOCTYPE html>"
-                  "<html>"
-                  "<head>"
-                  "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
-                  "<title>Configuração ESP32 Weather Station</title>"
-                  "<style>"
-                  "body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f7f7f7; }"
-                  ".container { max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }"
-                  "h1 { color: #0066cc; margin-top: 0; text-align: center; }"
-                  "label { display: block; margin-top: 10px; font-weight: bold; }"
-                  "input, select { width: 100%; padding: 8px; margin-top: 5px; margin-bottom: 15px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }"
-                  "button { background-color: #0066cc; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; }"
-                  "button:hover { background-color: #0052a3; }"
-                  ".section { border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px; }"
-                  "</style>"
-                  "</head>"
-                  "<body>"
-                  "<div class='container'>"
-                  "<h1>ESP32 Weather Station</h1>"
-                  "<form action='/save' method='post'>"
-                  
-                  "<div class='section'>"
-                  "<h2>Configurações Gerais</h2>"
-                  "<label for='deviceName'>Nome do Dispositivo:</label>"
-                  "<input type='text' id='deviceName' name='deviceName' value='");
+  String html = F("<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
+                  "<title>ESP32</title><style>"
+                  "body{font-family:Arial;margin:0;padding:10px;background:#f7f7f7}"
+                  "div{max-width:600px;margin:auto;background:#fff;padding:15px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.1)}"
+                  "h1{color:#06c;text-align:center}label{display:block;font-weight:700;margin-top:8px}"
+                  "input,select{width:100%;padding:6px;margin:3px 0 10px;border:1px solid #ddd;border-radius:4px}"
+                  "button{background:#06c;color:#fff;border:none;padding:8px;border-radius:4px;width:100%}"
+                  ".s{border-bottom:1px solid #eee;padding-bottom:10px;margin-bottom:10px}"
+                  "</style></head><body><div><h1>ESP32 Weather</h1><form action='/save' method='post'>");
+
+  // Configurações Gerais
+  html += F("<div class='s'><h3>Geral</h3>");
+  html += F("<label>Nome:</label><input name='deviceName' value='");
   html += _config.deviceName;
-  html += F("'>"
-            
-            "<label for='deepSleep'>Tempo entre Leituras (minutos):</label>"
-            "<input type='number' id='deepSleep' name='deepSleep' min='1' max='360' value='");
+  html += F("'><label>Sleep (min):</label><input type='number' name='deepSleep' min='1' max='360' value='");
   html += _config.deepSleepTimeMinutes;
-  html += F("'>"
-            
-            "<label for='cpuFreq'>Frequência da CPU (MHz):</label>"
-            "<select id='cpuFreq' name='cpuFreq'>");
-  html += _config.cpuFreqMHz == 80 ? F("<option value='80' selected>80 MHz</option>") : F("<option value='80'>80 MHz</option>");
-  html += _config.cpuFreqMHz == 160 ? F("<option value='160' selected>160 MHz</option>") : F("<option value='160'>160 MHz</option>");
-  html += F("</select>"
-            
-            "<label for='rainMmPerTip'>Calibração Pluviômetro (mm por basculada):</label>"
-            "<input type='number' id='rainMmPerTip' name='rainMmPerTip' min='0.1' max='5' step='0.05' value='");
+  html += F("'><label>CPU (MHz):</label><select name='cpuFreq'>");
+  html += _config.cpuFreqMHz == 80 ? F("<option value='80' selected>80</option>") : F("<option value='80'>80</option>");
+  html += _config.cpuFreqMHz == 160 ? F("<option value='160' selected>160</option>") : F("<option value='160'>160</option>");
+  html += F("</select><label>Rain (mm):</label><input type='number' name='rainMmPerTip' min='0.1' max='5' step='0.05' value='");
   html += String(_config.rainMmPerTip, 2);
-  html += F("'>"
-            "</div>"
-            
-            "<div class='section'>"
-            "<h2>Configurações Wi-Fi</h2>"
-            "<label for='wifiSsid'>SSID:</label>"
-            "<input type='text' id='wifiSsid' name='wifiSsid' value='");
+  html += F("'></div>");
+  
+  // WiFi
+  html += F("<div class='s'><h3>Wi-Fi</h3><label>SSID:</label><input name='wifiSsid' value='");
   html += _config.wifiSsid;
-  html += F("'>"
-            
-            "<label for='wifiPassword'>Senha:</label>"
-            "<input type='password' id='wifiPassword' name='wifiPassword' value='");
+  html += F("'><label>Senha:</label><input type='password' name='wifiPassword' value='");
   html += _config.wifiPassword;
-  html += F("'>"
-            "</div>"
-            
-            "<div class='section'>"
-            "<h2>Configurações Meshtastic</h2>"
-            "<label for='meshtasticNodeIP'>IP do Nó Meshtastic:</label>"
-            "<input type='text' id='meshtasticNodeIP' name='meshtasticNodeIP' value='");
+  html += F("'></div>");
+  
+  // Meshtastic
+  html += F("<div class='s'><h3>Meshtastic</h3><label>IP:</label><input name='meshtasticNodeIP' value='");
   html += _config.meshtasticNodeIP;
-  html += F("'>"
-            
-            "<label for='meshtasticNodePort'>Porta:</label>"
-            "<input type='number' id='meshtasticNodePort' name='meshtasticNodePort' min='1' max='65535' value='");
+  html += F("'><label>Porta:</label><input type='number' name='meshtasticNodePort' min='1' max='65535' value='");
   html += _config.meshtasticNodePort;
-  html += F("'>"
-            "</div>"
-            
-            "<button type='submit'>Salvar Configurações</button>"
-            "</form>"
-            "</div>"
-            "</body>"
-            "</html>");
-            
+  html += F("'></div><button type='submit'>Salvar</button></form></div></body></html>");
+  
   return html;
 }
 
@@ -487,32 +447,14 @@ void ConfigManager::handleConfigUpdate(AsyncWebServerRequest *request) {
     saveConfig();
   }
   
-  // Responde confirmando
-  String html = F("<!DOCTYPE html>"
-                  "<html>"
-                  "<head>"
-                  "<meta name='viewport' content='width=device-width, initial-scale=1.0'>"
-                  "<title>Configuração Salva</title>"
-                  "<style>"
-                  "body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f7f7f7; text-align: center; }"
-                  ".container { max-width: 600px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }"
-                  "h1 { color: #0066cc; }"
-                  "p { margin-bottom: 20px; }"
-                  ".message { color: #4CAF50; font-weight: bold; }"
-                  "a { display: inline-block; background-color: #0066cc; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; margin-top: 20px; }"
-                  "a:hover { background-color: #0052a3; }"
-                  "</style>"
-                  "<meta http-equiv='refresh' content='3;url=/'>"
-                  "</head>"
-                  "<body>"
-                  "<div class='container'>"
-                  "<h1>ESP32 Weather Station</h1>"
-                  "<p class='message'>Configurações salvas com sucesso!</p>"
-                  "<p>O dispositivo reiniciará em alguns segundos...</p>"
-                  "<a href='/'>Voltar</a>"
-                  "</div>"
-                  "</body>"
-                  "</html>");
+  // Responde confirmando - versão minimalista
+  String html = F("<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
+                  "<title>Salvo</title><style>body{font-family:Arial;text-align:center;padding:20px;background:#f7f7f7}"
+                  "div{max-width:320px;margin:auto;background:#fff;padding:15px;border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,.1)}"
+                  "h2{color:#06c}p{margin:15px 0}.g{color:#4CAF50;font-weight:700}</style>"
+                  "<meta http-equiv='refresh' content='3;url=/'></head><body><div>"
+                  "<h2>ESP32 Weather</h2><p class='g'>Configurações salvas!</p>"
+                  "<p>Reiniciando...</p></div></body></html>");
                   
   request->send(200, "text/html", html);
   
