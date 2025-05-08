@@ -28,7 +28,7 @@ enum Priority {
   UNSET = 0,
   MIN = 1,
   BACKGROUND = 10,
-  DEFAULT = 64,
+  NORMAL = 64,      // Renomeado de DEFAULT para NORMAL para evitar conflito
   RELIABLE = 70,
   ACK = 190,
   MAX = 200
@@ -89,11 +89,12 @@ const char* portnumToString(uint8_t portnum) {
 Priority priorityFromString(const char* prioText) {
   if (strcmp(prioText, "MIN") == 0) return MIN;
   if (strcmp(prioText, "BACKGROUND") == 0) return BACKGROUND;
-  if (strcmp(prioText, "DEFAULT") == 0) return DEFAULT;
+  if (strcmp(prioText, "NORMAL") == 0) return NORMAL;
+  if (strcmp(prioText, "DEFAULT") == 0) return NORMAL;  // Para compatibilidade com código existente
   if (strcmp(prioText, "RELIABLE") == 0) return RELIABLE;
   if (strcmp(prioText, "ACK") == 0) return ACK;
   if (strcmp(prioText, "MAX") == 0) return MAX;
-  return DEFAULT; // Valor padrão
+  return NORMAL; // Valor padrão
 }
 
 // Converte um valor numérico de prioridade para string
@@ -101,11 +102,11 @@ const char* priorityToString(Priority priority) {
   switch (priority) {
     case MIN: return "MIN";
     case BACKGROUND: return "BACKGROUND";
-    case DEFAULT: return "DEFAULT";
+    case NORMAL: return "NORMAL";
     case RELIABLE: return "RELIABLE";
     case ACK: return "ACK";
     case MAX: return "MAX";
-    default: return "DEFAULT";
+    default: return "NORMAL";
   }
 }
 
