@@ -361,7 +361,7 @@ bool readDHT22(float &temperature, float &humidity) {
 }
 #endif
 
-// Send data to Meshtastic node using the toRadio API endpoint
+// Send data to Meshtastic node using the toRadio API endpoint with correct protobuf structure
 void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   Serial.println("Preparing data for Meshtastic node...");
   
@@ -405,20 +405,27 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   Serial.print("Weather data: ");
   Serial.println(dataString);
   
-  // Prepare a payload for the Meshtastic toRadio API
-  // Based on the Meshtastic API structure, we create a JSON that will be interpreted correctly
-  StaticJsonDocument<512> radioDoc;
+  // Create the ToRadio message structure according to Meshtastic protobufs
+  StaticJsonDocument<1024> toRadioDoc;
   
-  // Structure the message according to Meshtastic API requirements
-  radioDoc["id"] = random(1, 1000000);   // Message ID
-  radioDoc["to"] = 0;                    // Destination node ID, 0=broadcast
-  radioDoc["want_ack"] = false;          // Not requesting acknowledgment
-  radioDoc["portnum"] = 1;               // Port number for text messages (ATAK is 32, but regular text is 1)
-  radioDoc["payload"] = dataString;      // The weather data as payload
+  // Create a meshPacket object (this will be nested within the toRadio message)
+  JsonObject packetObj = toRadioDoc.createNestedObject("packet");
   
-  // Serialize the radio JSON
-  String radioJson;
-  serializeJson(radioDoc, radioJson);
+  // Fill in MeshPacket fields according to the protobuf definition
+  packetObj["from"] = 0;                                // Our device ID (0 means it should get our node number)
+  packetObj["to"] = BROADCAST_ADDR;                     // Broadcast to all nodes (BROADCAST_ADDR = 0xffffffff)
+  packetObj["id"] = random(0, 1000000);                 // Random packet ID
+  packetObj["want_ack"] = false;                        // No acknowledgment needed 
+  packetObj["priority"] = "RELIABLE";                   // Priority for the packet
+  
+  // Create the payload object within the packet
+  JsonObject payloadObj = packetObj.createNestedObject("decoded");
+  payloadObj["portnum"] = "TEXT_MESSAGE_APP";           // Use text message app (port 1)
+  payloadObj["payload"] = dataString;                   // The weather data as string payload
+  
+  // Serialize the ToRadio JSON
+  String toRadioJson;
+  serializeJson(toRadioDoc, toRadioJson);
   
   // Send data to Meshtastic node
   Serial.println("Sending data to Meshtastic node...");
@@ -429,14 +436,14 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   
   Serial.print("Sending to URL: ");
   Serial.println(url);
-  Serial.print("Payload: ");
-  Serial.println(radioJson);
+  Serial.print("ToRadio payload: ");
+  Serial.println(toRadioJson);
   
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
   
   // The toRadio endpoint uses PUT request
-  int httpResponseCode = http.PUT(radioJson);
+  int httpResponseCode = http.PUT(toRadioJson);
   
   if (httpResponseCode > 0) {
     Serial.print("HTTP Response code: ");

@@ -47,4 +47,7 @@
 // Debug configuration
 #define DEBUG_ENABLED true     // Enable/disable debug output
 
+// Meshtastic specific constants
+#define BROADCAST_ADDR 0xffffffff  // Broadcast address for Meshtastic nodes
+
 #endif // CONFIG_H
