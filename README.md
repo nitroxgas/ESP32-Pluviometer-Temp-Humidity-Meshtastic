@@ -22,7 +22,8 @@ Este projeto implementa uma estação meteorológica com eficiência energética
 - Interface de configuração remota:
   - Portal web acessível via WiFi quando no modo de configuração
   - Configuração BLE para ajuste de parâmetros via smartphone
-  - Persistência de configurações usando LittleFS
+  - Persistência de configurações usando SPIFFS
+  - Modo de configuração automático quando falha conexão WiFi
 
 ## Requisitos de Hardware
 
@@ -122,9 +123,9 @@ Observe que o código será compilado apenas com as partes relevantes para os se
     - Certifique-se de que apenas um sensor está conectado ao barramento I2C durante os testes iniciais
 
 - Se a conexão WiFi falhar:
-  - Verifique suas credenciais usando o portal de configuração
-  - Verifique a força do sinal WiFi
-  - Reinicie o dispositivo e entre no modo de configuração para atualizar as credenciais
+  - O portal de configuração será iniciado automaticamente
+  - Você pode se conectar ao ponto de acesso WiFi e atualizar as credenciais
+  - O dispositivo tentará conectar-se novamente após salvar as novas configurações
 
 - Se os dados não estiverem sendo recebidos pelo nó Meshtastic:
   - Verifique o endereço IP do nó Meshtastic usando o portal de configuração
