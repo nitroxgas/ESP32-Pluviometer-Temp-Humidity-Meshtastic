@@ -1,4 +1,9 @@
 #include "ConfigManager.h"
+#include <FS.h>
+#include <LITTLEFS.h>
+
+// Define a macro para LittleFS
+#define LittleFS LITTLEFS
 
 // Instância global
 ConfigManager configManager;
@@ -58,7 +63,13 @@ bool ConfigManager::loadConfig() {
   // Carrega dados do JSON para a estrutura
   _config.deepSleepTimeMinutes = doc["sleep"] | DEFAULT_DEEP_SLEEP_TIME_MINUTES;
   _config.cpuFreqMHz = doc["cpu"] | DEFAULT_CPU_FREQ_MHZ;
-  _config.rainMmPerTip = doc["rain"].as<float>() | DEFAULT_RAIN_MM_PER_TIP;
+  
+  // Para valores float, precisamos tratar de forma diferente
+  if (doc.containsKey("rain")) {
+    _config.rainMmPerTip = doc["rain"].as<float>();
+  } else {
+    _config.rainMmPerTip = DEFAULT_RAIN_MM_PER_TIP;
+  }
   
   strlcpy(_config.wifiSsid, doc["ssid"] | DEFAULT_WIFI_SSID, sizeof(_config.wifiSsid));
   strlcpy(_config.wifiPassword, doc["pass"] | DEFAULT_WIFI_PASSWORD, sizeof(_config.wifiPassword));
