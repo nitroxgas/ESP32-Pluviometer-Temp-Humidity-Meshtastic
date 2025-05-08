@@ -21,6 +21,7 @@
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include "config.h"
+#include "ConfigManager.h"
 
 // Sensor-specific includes and initialization
 #ifdef USE_DHT22
@@ -41,10 +42,12 @@
 // Define RTC variables that persist through deep sleep
 RTC_DATA_ATTR int rainCounter = 0;    // Rain counter
 RTC_DATA_ATTR bool isFirstRun = true; // Flag for first run after power-on
+RTC_DATA_ATTR bool needsConfiguration = false; // Flag to enter configuration mode
 
 // Define wake-up sources
 #define TIMER_WAKEUP 1
 #define EXTERNAL_WAKEUP 2
+#define BUTTON_WAKEUP 3
 RTC_DATA_ATTR int wakeupReason = 0;
 
 // Variables for runtime management
@@ -85,11 +88,53 @@ void setup() {
   
   Serial.println("\n\nESP32 Weather Station Starting...");
   
-  // Set CPU frequency to 160MHz
-  setCpuFrequency();
+  // Initialize ConfigManager
+  if (!configManager.begin()) {
+    Serial.println("Failed to initialize ConfigManager!");
+    // Continue with default values
+  }
   
   // Determine wake-up reason
   printWakeupReason();
+  
+  // Get current configuration
+  WeatherStationConfig* config = configManager.getConfig();
+  
+  // Check if device should enter config mode
+  if (needsConfiguration || configManager.checkConfigButtonPressed()) {
+    Serial.println("Entering configuration mode...");
+    
+    #ifdef USE_CONFIG_PORTAL
+      // Start configuration interfaces
+      configManager.startBLEServer();
+      configManager.startConfigPortal();
+      
+      unsigned long configStartTime = millis();
+      
+      // Stay in config mode for CONFIG_PORTAL_TIMEOUT seconds or until button pressed again
+      while (millis() - configStartTime < (CONFIG_PORTAL_TIMEOUT * 1000) && 
+             !configManager.checkConfigButtonPressed()) {
+        // Handle config portal
+        configManager.handlePortal();
+        delay(100);
+      }
+      
+      // Clean up
+      configManager.stopConfigPortal();
+      configManager.stopBLEServer();
+      
+      Serial.println("Exiting configuration mode");
+      
+      // Return to normal operation
+      ESP.restart();
+      return;
+    #else
+      Serial.println("Configuration portal not enabled in this build");
+    #endif
+  }
+  
+  // Set CPU frequency to value from configuration
+  setCpuFrequency();
   
   // If this is the first run after power-on, initialize rain counter
   if (isFirstRun) {
@@ -132,8 +177,8 @@ void setup() {
     Serial.println("Rain detected! Counter: " + String(rainCounter));
   }
   
-  // Calculate total rain amount
-  rainAmount = rainCounter * RAIN_MM_PER_TIP;
+  // Calculate total rain amount with calibration from config
+  rainAmount = rainCounter * config->rainMmPerTip;
   
   // Connect to WiFi
   setupWiFi();
@@ -167,12 +212,15 @@ void loop() {
   // This will never run as the device enters deep sleep at the end of setup()
 }
 
-// Set CPU frequency to value defined in config.h (default 160MHz)
+// Set CPU frequency to value from configuration
 void setCpuFrequency() {
+  WeatherStationConfig* config = configManager.getConfig();
+  uint16_t cpuFreq = config->cpuFreqMHz;
+  
   Serial.print("Setting CPU frequency to ");
-  Serial.print(CPU_FREQ_MHZ);
+  Serial.print(cpuFreq);
   Serial.print("MHz...");
-  if (setCpuFrequencyMhz(CPU_FREQ_MHZ)) {
+  if (setCpuFrequencyMhz(cpuFreq)) {
     Serial.println("Success!");
   } else {
     Serial.println("Failed!");
@@ -204,8 +252,13 @@ void printWakeupReason() {
   
   switch(wakeup_reason) {
     case ESP_SLEEP_WAKEUP_EXT0:
-      Serial.println("Wakeup caused by external signal using RTC_IO");
+      Serial.println("Wakeup caused by external signal using RTC_IO (rain gauge)");
       wakeupReason = EXTERNAL_WAKEUP;
+      break;
+    case ESP_SLEEP_WAKEUP_EXT1:
+      Serial.println("Wakeup caused by external signal using RTC_CNTL (config button)");
+      wakeupReason = BUTTON_WAKEUP;
+      needsConfiguration = true;
       break;
     case ESP_SLEEP_WAKEUP_TIMER:
       Serial.println("Wakeup caused by timer");
@@ -222,8 +275,14 @@ void printWakeupReason() {
 void setupWiFi() {
   Serial.println("Connecting to WiFi...");
   
+  // Get WiFi credentials from config
+  WeatherStationConfig* config = configManager.getConfig();
+  
   WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  WiFi.begin(config->wifiSsid, config->wifiPassword);
+  
+  Serial.print("Connecting to: ");
+  Serial.println(config->wifiSsid);
   
   unsigned long startAttemptTime = millis();
   
@@ -243,6 +302,7 @@ void setupWiFi() {
   }
 }
 
+#ifdef USE_DHT22
 // Read temperature and humidity from DHT22 sensor
 bool readDHT22(float &temperature, float &humidity) {
   Serial.println("Reading DHT22 sensor...");
@@ -269,10 +329,14 @@ bool readDHT22(float &temperature, float &humidity) {
   Serial.println("All attempts to read DHT sensor failed!");
   return false;
 }
+#endif
 
 // Send data to Meshtastic node
 void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   Serial.println("Preparing data for Meshtastic node...");
+  
+  // Get Meshtastic configuration
+  WeatherStationConfig* config = configManager.getConfig();
   
   // Create JSON document
   StaticJsonDocument<256> doc;
@@ -300,8 +364,9 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
     doc["sensor"] = "BMP280";
   #endif
   
-  // Include rain data
+  // Include rain data and calibration
   doc["rain"] = rainAmount;
+  doc["node_name"] = config->deviceName;
   
   // Serialize JSON to string
   String jsonString;
@@ -314,8 +379,11 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   Serial.println("Sending data to Meshtastic node...");
   
   HTTPClient http;
-  String url = "http://" + String(MESHTASTIC_NODE_IP) + ":" + 
-               String(MESHTASTIC_NODE_PORT) + MESHTASTIC_API_ENDPOINT;
+  String url = "http://" + String(config->meshtasticNodeIP) + ":" + 
+               String(config->meshtasticNodePort) + MESHTASTIC_API_ENDPOINT;
+  
+  Serial.print("Sending to: ");
+  Serial.println(url);
   
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
@@ -339,14 +407,21 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
 void setupDeepSleep() {
   Serial.println("Configuring deep sleep...");
   
+  // Get sleep time from config
+  WeatherStationConfig* config = configManager.getConfig();
+  
   // Configure external wake-up source (rain gauge interrupt)
   esp_sleep_enable_ext0_wakeup(RAIN_GAUGE_INTERRUPT_PIN, HIGH);
   Serial.println("External wake-up configured on pin " + String(RAIN_GAUGE_INTERRUPT_PIN));
   
+  // Configure button wake-up (for configuration mode)
+  esp_sleep_enable_ext1_wakeup(1ULL << CONFIG_BUTTON_PIN, ESP_EXT1_WAKEUP_ALL_LOW);
+  Serial.println("Button wake-up configured on pin " + String(CONFIG_BUTTON_PIN));
+  
   // Configure timer wake-up
-  uint64_t sleepTime = DEEP_SLEEP_TIME_MINUTES * uS_TO_MIN_FACTOR;
+  uint64_t sleepTime = config->deepSleepTimeMinutes * uS_TO_MIN_FACTOR;
   esp_sleep_enable_timer_wakeup(sleepTime);
-  Serial.println("Timer wake-up configured for " + String(DEEP_SLEEP_TIME_MINUTES) + " minutes");
+  Serial.println("Timer wake-up configured for " + String(config->deepSleepTimeMinutes) + " minutes");
 }
 
 // Initialize the appropriate sensor based on build flags

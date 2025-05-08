@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+  <title>ESP32 Weather Station</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 0; 
+      padding: 20px; 
+      background-color: #f7f7f7; 
+    }
+    .container { 
+      max-width: 600px; 
+      margin: 0 auto; 
+      background-color: white; 
+      padding: 20px; 
+      border-radius: 8px; 
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); 
+    }
+    h1 { 
+      color: #0066cc; 
+      margin-top: 0; 
+      text-align: center; 
+    }
+    .reading {
+      padding: 10px;
+      margin-bottom: 10px;
+      background-color: #f0f8ff;
+      border-left: 4px solid #0066cc;
+      border-radius: 4px;
+    }
+    .label {
+      font-weight: bold;
+      display: inline-block;
+      width: 150px;
+    }
+    .value {
+      font-size: 18px;
+      color: #333;
+    }
+    .config-btn {
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: block;
+      margin: 20px auto;
+      font-size: 16px;
+    }
+    .config-btn:hover {
+      background-color: #0052a3;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      color: #666;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class='container'>
+    <h1>ESP32 Weather Station</h1>
+    
+    <div id="readings">
+      <div class="reading">
+        <div><span class="label">Temperatura:</span> <span class="value" id="temp">--</span> °C</div>
+      </div>
+      
+      <div class="reading">
+        <div><span class="label">Umidade:</span> <span class="value" id="humidity">--</span> %</div>
+      </div>
+      
+      <div class="reading">
+        <div><span class="label">Pressão:</span> <span class="value" id="pressure">--</span> hPa</div>
+      </div>
+      
+      <div class="reading">
+        <div><span class="label">Precipitação:</span> <span class="value" id="rain">--</span> mm</div>
+      </div>
+    </div>
+    
+    <button class="config-btn" onclick="window.location.href='/config'">Configurações</button>
+    
+    <div class="footer">
+      ESP32 Weather Station v1.0<br>
+      Última leitura: <span id="lastUpdate">--</span>
+    </div>
+  </div>
+</body>
+</html>
