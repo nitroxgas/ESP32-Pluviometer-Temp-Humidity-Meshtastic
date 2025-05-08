@@ -298,7 +298,37 @@ void setupWiFi() {
     Serial.println(WiFi.localIP());
   } else {
     Serial.println();
-    Serial.println("Connection failed!");
+    Serial.println("Connection failed! Starting configuration portal...");
+    
+    #ifdef USE_CONFIG_PORTAL
+      // Disconnect failed WiFi connection
+      WiFi.disconnect(true);
+      
+      // Start configuration interfaces
+      configManager.startBLEServer();
+      configManager.startConfigPortal();
+      
+      unsigned long configStartTime = millis();
+      
+      // Stay in config mode for CONFIG_PORTAL_TIMEOUT seconds or until button pressed again
+      while (millis() - configStartTime < (CONFIG_PORTAL_TIMEOUT * 1000) && 
+             !configManager.checkConfigButtonPressed()) {
+        // Handle config portal
+        configManager.handlePortal();
+        delay(100);
+      }
+      
+      // Clean up
+      configManager.stopConfigPortal();
+      configManager.stopBLEServer();
+      
+      Serial.println("Exiting configuration mode after WiFi failure");
+      
+      // Restart device to try with new settings
+      ESP.restart();
+    #else
+      Serial.println("Configuration portal not enabled in this build");
+    #endif
   }
 }
 
