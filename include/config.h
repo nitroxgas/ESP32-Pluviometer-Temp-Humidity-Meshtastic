@@ -11,12 +11,12 @@
 #define RAIN_GAUGE_INTERRUPT_PIN 27 // Rain gauge interrupt pin (GPIO27)
 
 // WiFi configuration
-#define WIFI_SSID "your_wifi_ssid"        // WiFi SSID
-#define WIFI_PASSWORD "your_wifi_password" // WiFi password
+#define WIFI_SSID "GeorgeHome"        // WiFi SSID
+#define WIFI_PASSWORD "Cz1mwyh." // WiFi password
 #define WIFI_TIMEOUT 20000                // WiFi connection timeout in milliseconds
 
 // Meshtastic node configuration
-#define MESHTASTIC_NODE_IP "192.168.1.100"  // IP address of Meshtastic node
+#define MESHTASTIC_NODE_IP "192.168.1.98"  // IP address of Meshtastic node
 #define MESHTASTIC_NODE_PORT 80             // Port of Meshtastic node
 #define MESHTASTIC_API_ENDPOINT "/api/v1/sendtext"  // Endpoint for sending data
 
