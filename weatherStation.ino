@@ -15,28 +15,14 @@
  * - When the rain gauge triggers an interrupt
  */
 
-#include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <DHT.h>
 #include <ArduinoJson.h>
-#include <Wire.h>
 #include "config.h"
 
-// Sensor-specific includes and initialization
-#ifdef USE_DHT22
-    #include <DHT.h>
-    DHT dht(DHT_PIN, DHT22);
-#endif
-
-#ifdef USE_AHT20
-    #include <Adafruit_AHTX0.h>
-    Adafruit_AHTX0 aht;
-#endif
-
-#ifdef USE_BMP280
-    #include <Adafruit_BMP280.h>
-    Adafruit_BMP280 bmp;
-#endif
+// Initialize DHT sensor
+DHT dht(DHT_PIN, DHT22);
 
 // Define RTC variables that persist through deep sleep
 RTC_DATA_ATTR int rainCounter = 0;    // Rain counter
@@ -52,21 +38,7 @@ unsigned long startTime; // To track how long the device has been running
 
 // Function prototypes
 void setupWiFi();
-void setupSensors();
-bool readSensorData(float &temperature, float &humidity);
-
-#ifdef USE_DHT22
 bool readDHT22(float &temperature, float &humidity);
-#endif
-
-#ifdef USE_AHT20
-bool readAHT20(float &temperature, float &humidity);
-#endif
-
-#ifdef USE_BMP280
-bool readBMP280(float &temperature, float &humidity);
-#endif
-
 void sendDataToMeshtastic(float temperature, float humidity, float rainAmount);
 void printWakeupReason();
 void setupDeepSleep();
@@ -98,8 +70,8 @@ void setup() {
     isFirstRun = false;
   }
   
-  // Initialize sensors
-  setupSensors();
+  // Initialize DHT sensor
+  dht.begin();
   
   // Read sensor data
   float temperature = 0.0;
@@ -115,7 +87,7 @@ void setup() {
   }
   
   // Read temperature and humidity
-  bool sensorReadSuccess = readSensorData(temperature, humidity);
+  bool dhtReadSuccess = readDHT22(temperature, humidity);
   
   // Check again if we should enter sleep after sensor reading
   if (shouldEnterSleep()) {
@@ -275,32 +247,9 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   Serial.println("Preparing data for Meshtastic node...");
   
   // Create JSON document
-  StaticJsonDocument<256> doc;
-  
-  // Include temperature data
+  StaticJsonDocument<200> doc;
   doc["temperature"] = temperature;
-  
-  // Include sensor-specific data
-  #ifdef USE_DHT22
-    doc["humidity"] = humidity;
-    doc["sensor"] = "DHT22";
-  #endif
-  
-  // When both I2C sensors are used, we get more complete data
-  #if defined(USE_AHT20) && defined(USE_BMP280)
-    doc["humidity"] = humidity;
-    float pressure = bmp.readPressure() / 100.0F; // Convert Pa to hPa
-    doc["pressure"] = pressure;
-    doc["sensor"] = "AHT20+BMP280";
-  #elif defined(USE_AHT20)
-    doc["humidity"] = humidity;
-    doc["sensor"] = "AHT20";
-  #elif defined(USE_BMP280)
-    doc["pressure"] = bmp.readPressure() / 100.0F; // Convert Pa to hPa
-    doc["sensor"] = "BMP280";
-  #endif
-  
-  // Include rain data
+  doc["humidity"] = humidity;
   doc["rain"] = rainAmount;
   
   // Serialize JSON to string
@@ -348,131 +297,3 @@ void setupDeepSleep() {
   esp_sleep_enable_timer_wakeup(sleepTime);
   Serial.println("Timer wake-up configured for " + String(DEEP_SLEEP_TIME_MINUTES) + " minutes");
 }
-
-// Initialize the appropriate sensor based on build flags
-void setupSensors() {
-  #ifdef USE_DHT22
-    Serial.println("Initializing DHT22 sensor...");
-    dht.begin();
-  #endif
-
-  // Initialize I2C once for both AHT20 and BMP280 if needed
-  #if defined(USE_AHT20) || defined(USE_BMP280)
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-  #endif
-
-  #ifdef USE_AHT20
-    Serial.println("Initializing AHT20 sensor...");
-    if (!aht.begin()) {
-      Serial.println("Could not find AHT20 sensor! Check wiring");
-    } else {
-      Serial.println("AHT20 sensor found");
-    }
-  #endif
-
-  #ifdef USE_BMP280
-    Serial.println("Initializing BMP280 sensor...");
-    if (!bmp.begin(BMP280_ADDRESS)) {
-      Serial.println("Could not find BMP280 sensor! Check wiring or try a different address");
-    } else {
-      // Default settings from the datasheet
-      bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     // Operating Mode
-                      Adafruit_BMP280::SAMPLING_X2,     // Temp. oversampling
-                      Adafruit_BMP280::SAMPLING_X16,    // Pressure oversampling
-                      Adafruit_BMP280::FILTER_X16,      // Filtering
-                      Adafruit_BMP280::STANDBY_MS_500); // Standby time
-      Serial.println("BMP280 sensor found");
-    }
-  #endif
-}
-
-// Main function to read sensor data
-bool readSensorData(float &temperature, float &humidity) {
-  bool success = false;
-
-  #ifdef USE_DHT22
-    success = readDHT22(temperature, humidity);
-  #endif
-
-  // When both I2C sensors are used, prefer AHT20 for temperature/humidity
-  // and BMP280 for additional pressure reading
-  #if defined(USE_AHT20) && defined(USE_BMP280)
-    success = readAHT20(temperature, humidity);
-    // We'll read pressure from BMP280 separately when sending data
-  #elif defined(USE_AHT20)
-    success = readAHT20(temperature, humidity);
-  #elif defined(USE_BMP280)
-    success = readBMP280(temperature, humidity);
-  #endif
-
-  // If no sensor is defined, return false
-  if (!success) {
-    Serial.println("Failed to read from sensors or no sensors defined in build flags!");
-  }
-  
-  return success;
-}
-
-#ifdef USE_AHT20
-// Read temperature and humidity from AHT20 sensor
-bool readAHT20(float &temperature, float &humidity) {
-  Serial.println("Reading AHT20 sensor...");
-  
-  sensors_event_t humidityEvent, temperatureEvent;
-  
-  // Try reading a few times
-  for (int i = 0; i < 3; i++) {
-    if (aht.getEvent(&humidityEvent, &temperatureEvent)) {
-      humidity = humidityEvent.relative_humidity;
-      temperature = temperatureEvent.temperature;
-      
-      Serial.print("Temperature: ");
-      Serial.print(temperature);
-      Serial.println(" °C");
-      Serial.print("Humidity: ");
-      Serial.print(humidity);
-      Serial.println(" %");
-      return true;
-    }
-    
-    Serial.println("Failed to read from AHT20 sensor, retrying...");
-    delay(2000);
-  }
-  
-  Serial.println("All attempts to read AHT20 sensor failed!");
-  return false;
-}
-#endif
-
-#ifdef USE_BMP280
-// Read temperature and pressure from BMP280 sensor (BMP280 doesn't have humidity, use 0)
-bool readBMP280(float &temperature, float &humidity) {
-  Serial.println("Reading BMP280 sensor...");
-  
-  // Try reading a few times
-  for (int i = 0; i < 3; i++) {
-    temperature = bmp.readTemperature();
-    // BMP280 doesn't measure humidity, so set humidity to 0
-    humidity = 0;
-    
-    float pressure = bmp.readPressure() / 100.0F; // Convert Pa to hPa
-    
-    if (!isnan(temperature) && !isnan(pressure)) {
-      Serial.print("Temperature: ");
-      Serial.print(temperature);
-      Serial.println(" °C");
-      Serial.print("Pressure: ");
-      Serial.print(pressure);
-      Serial.println(" hPa");
-      Serial.println("Note: BMP280 does not have humidity sensor");
-      return true;
-    }
-    
-    Serial.println("Failed to read from BMP280 sensor, retrying...");
-    delay(2000);
-  }
-  
-  Serial.println("All attempts to read BMP280 sensor failed!");
-  return false;
-}
-#endif

@@ -1,0 +1,7 @@
+{
+  "tag_name": "v1.0.0",
+  "name": "Versão Inicial",
+  "body": "Primeira versão da estação meteorológica ESP32 com integração Meshtastic",
+  "draft": false,
+  "prerelease": false
+}

@@ -7,22 +7,8 @@
 #define MAX_RUNTIME_MS 30000       // Maximum runtime before going to sleep (30 seconds)
 
 // Pin definitions
+#define DHT_PIN 4                  // DHT22 data pin
 #define RAIN_GAUGE_INTERRUPT_PIN 27 // Rain gauge interrupt pin (GPIO27)
-
-// Sensor pin definitions
-#ifdef USE_DHT22
-    #define DHT_PIN 4                  // DHT22 data pin
-#endif
-
-// I2C pin definitions (for AHT20 and BMP280)
-#if defined(USE_AHT20) || defined(USE_BMP280)
-    #define I2C_SDA_PIN 21             // I2C SDA pin
-    #define I2C_SCL_PIN 22             // I2C SCL pin
-#endif
-
-#ifdef USE_BMP280
-    #define BMP280_ADDRESS 0x76        // Default BMP280 I2C address (some modules use 0x77)
-#endif
 
 // WiFi configuration
 #define WIFI_SSID "your_wifi_ssid"        // WiFi SSID
