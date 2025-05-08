@@ -1,9 +1,9 @@
 #include "ConfigManager.h"
 #include <FS.h>
-#include <LITTLEFS.h>
+#include <SPIFFS.h>
 
 // Define a macro para LittleFS
-#define LittleFS LITTLEFS
+#define LittleFS SPIFFS
 
 // Instância global
 ConfigManager configManager;
@@ -27,8 +27,20 @@ ConfigManager::ConfigManager() {
 bool ConfigManager::begin() {
   // Inicializa sistema de arquivos
   if (!LittleFS.begin(true)) {
-    Serial.println("Falha ao montar sistema de arquivos LittleFS");
-    return false;
+    Serial.println("Falha ao montar sistema de arquivos SPIFFS");
+    Serial.println("Tentando formatar...");
+    
+    if (!SPIFFS.format()) {
+      Serial.println("Formatação do SPIFFS falhou");
+      return false;
+    }
+    
+    if (!LittleFS.begin()) {
+      Serial.println("Falha ao montar SPIFFS mesmo após formatação");
+      return false;
+    }
+    
+    Serial.println("SPIFFS formatado com sucesso");
   }
   
   // Carrega configuração ou usa padrão
