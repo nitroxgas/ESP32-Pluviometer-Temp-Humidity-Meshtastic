@@ -5,9 +5,9 @@
 #define DEFAULT_DEEP_SLEEP_TIME_MINUTES 5    // Deep sleep duration in minutes
 #define DEFAULT_CPU_FREQ_MHZ 160             // CPU frequency in MHz (80 or 160 for ESP32)
 #define DEFAULT_RAIN_MM_PER_TIP 0.25         // Rain gauge produces 0.25mm per tip/interrupt
-#define DEFAULT_WIFI_SSID "your_wifi_ssid"        // WiFi SSID
-#define DEFAULT_WIFI_PASSWORD "your_wifi_password" // WiFi password
-#define DEFAULT_MESHTASTIC_NODE_IP "192.168.1.100"  // IP address of Meshtastic node
+#define DEFAULT_WIFI_SSID "GeorgeHome"        // WiFi SSID
+#define DEFAULT_WIFI_PASSWORD "Cz1mwyh." // WiFi password
+#define DEFAULT_MESHTASTIC_NODE_IP "192.168.1.98"  // IP address of Meshtastic node
 #define DEFAULT_MESHTASTIC_NODE_PORT 80             // Port of Meshtastic node
 #define DEFAULT_DEVICE_NAME "ESP32-Weather"        // Nome do dispositivo para BLE
 
