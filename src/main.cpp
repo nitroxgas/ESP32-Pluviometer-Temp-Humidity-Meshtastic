@@ -22,6 +22,7 @@
 #include <Wire.h>
 #include "config.h"
 #include "ConfigManager.h"
+#include "meshtastic-protobuf.h"
 
 // Sensor-specific includes and initialization
 #ifdef USE_DHT22
@@ -361,7 +362,7 @@ bool readDHT22(float &temperature, float &humidity) {
 }
 #endif
 
-// Send data to Meshtastic node using the toRadio API endpoint with correct protobuf structure
+// Send data to Meshtastic node using the toRadio API endpoint with proper protobuf structure
 void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   Serial.println("Preparing data for Meshtastic node...");
   
@@ -405,27 +406,32 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   Serial.print("Weather data: ");
   Serial.println(dataString);
   
-  // Create the ToRadio message structure according to Meshtastic protobufs
-  StaticJsonDocument<1024> toRadioDoc;
+  // ===== Usar estrutura protobuf para Meshtastic =====
   
-  // Create a meshPacket object (this will be nested within the toRadio message)
-  JsonObject packetObj = toRadioDoc.createNestedObject("packet");
+  // Criar um pacote MeshPacket usando a estrutura definida
+  MeshPacket meshPacket;
   
-  // Fill in MeshPacket fields according to the protobuf definition
-  packetObj["from"] = 0;                                // Our device ID (0 means it should get our node number)
-  packetObj["to"] = BROADCAST_ADDR;                     // Broadcast to all nodes (BROADCAST_ADDR = 0xffffffff)
-  packetObj["id"] = random(0, 1000000);                 // Random packet ID
-  packetObj["want_ack"] = false;                        // No acknowledgment needed 
-  packetObj["priority"] = "RELIABLE";                   // Priority for the packet
+  // Preencher os campos do MeshPacket conforme definição do protobuf Meshtastic
+  meshPacket.from = 0;                      // Usar nosso ID de nó (0 = próprio nó)
+  meshPacket.to = BROADCAST_ADDR;           // Destino: broadcast para todos os nós
+  meshPacket.id = random(0, 1000000);       // ID aleatório para a mensagem
+  meshPacket.want_ack = false;              // Não requer confirmação
+  meshPacket.port = TEXT_MESSAGE_APP;       // Porta para mensagens de texto (1)
   
-  // Create the payload object within the packet
-  JsonObject payloadObj = packetObj.createNestedObject("decoded");
-  payloadObj["portnum"] = "TEXT_MESSAGE_APP";           // Use text message app (port 1)
-  payloadObj["payload"] = dataString;                   // The weather data as string payload
+  // Copiar dados (limitado ao tamanho do buffer)
+  if (dataString.length() < sizeof(meshPacket.payload.data)) {
+    strncpy(meshPacket.payload.data, dataString.c_str(), sizeof(meshPacket.payload.data) - 1);
+    meshPacket.payload.data[sizeof(meshPacket.payload.data) - 1] = '\0'; // Garantir terminação
+    meshPacket.payload.size = dataString.length();
+  } else {
+    Serial.println("AVISO: Dados muito grandes para o payload, serão truncados");
+    strncpy(meshPacket.payload.data, dataString.c_str(), sizeof(meshPacket.payload.data) - 1);
+    meshPacket.payload.data[sizeof(meshPacket.payload.data) - 1] = '\0';
+    meshPacket.payload.size = sizeof(meshPacket.payload.data) - 1;
+  }
   
-  // Serialize the ToRadio JSON
-  String toRadioJson;
-  serializeJson(toRadioDoc, toRadioJson);
+  // Converter a estrutura MeshPacket em JSON para a API HTTP do Meshtastic
+  String toRadioJson = createMeshtasticToRadioJson(meshPacket);
   
   // Send data to Meshtastic node
   Serial.println("Sending data to Meshtastic node...");
@@ -436,7 +442,7 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   
   Serial.print("Sending to URL: ");
   Serial.println(url);
-  Serial.print("ToRadio payload: ");
+  Serial.print("ToRadio payload (protobuf): ");
   Serial.println(toRadioJson);
   
   // Verificar se consegue conectar ao host Meshtastic
