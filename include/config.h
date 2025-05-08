@@ -15,7 +15,7 @@
 #define MAX_RUNTIME_MS 30000         // Maximum runtime before forced sleep (30 seconds)
 #define uS_TO_MIN_FACTOR 60000000ULL // Conversion factor: microseconds to minutes
 #define WIFI_TIMEOUT 20000           // WiFi connection timeout in milliseconds
-#define MESHTASTIC_API_ENDPOINT "/api/v1/messages"  // Endpoint for sending messages (REST API)
+#define MESHTASTIC_API_ENDPOINT "/api/v1/toradio"  // Endpoint for sending messages to radio
 #define CONFIG_AP_PASSWORD "weatherconfig"  // Senha do ponto de acesso no modo configuração
 #define CONFIG_PORTAL_TIMEOUT 180    // Tempo limite (em segundos) do portal de configuração
 

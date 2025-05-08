@@ -361,7 +361,7 @@ bool readDHT22(float &temperature, float &humidity) {
 }
 #endif
 
-// Send data to Meshtastic node using the REST API
+// Send data to Meshtastic node using the toRadio API endpoint
 void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   Serial.println("Preparing data for Meshtastic node...");
   
@@ -405,17 +405,20 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   Serial.print("Weather data: ");
   Serial.println(dataString);
   
-  // Create the message JSON according to Meshtastic REST API format
-  StaticJsonDocument<512> messageDoc;
+  // Prepare a payload for the Meshtastic toRadio API
+  // Based on the Meshtastic API structure, we create a JSON that will be interpreted correctly
+  StaticJsonDocument<512> radioDoc;
   
-  // Message parameters required by the Meshtastic API
-  messageDoc["channelId"] = 0; // Default channel (0)
-  messageDoc["text"] = dataString; // Our weather data as the message text
-  messageDoc["serviceId"] = "WEATHER_DATA"; // Custom service ID to identify our messages
+  // Structure the message according to Meshtastic API requirements
+  radioDoc["id"] = random(1, 1000000);   // Message ID
+  radioDoc["to"] = 0;                    // Destination node ID, 0=broadcast
+  radioDoc["want_ack"] = false;          // Not requesting acknowledgment
+  radioDoc["portnum"] = 1;               // Port number for text messages (ATAK is 32, but regular text is 1)
+  radioDoc["payload"] = dataString;      // The weather data as payload
   
-  // Serialize the message JSON
-  String messageJson;
-  serializeJson(messageDoc, messageJson);
+  // Serialize the radio JSON
+  String radioJson;
+  serializeJson(radioDoc, radioJson);
   
   // Send data to Meshtastic node
   Serial.println("Sending data to Meshtastic node...");
@@ -426,14 +429,14 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   
   Serial.print("Sending to URL: ");
   Serial.println(url);
-  Serial.print("Message payload: ");
-  Serial.println(messageJson);
+  Serial.print("Payload: ");
+  Serial.println(radioJson);
   
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
   
-  // Send a POST request with our JSON message
-  int httpResponseCode = http.POST(messageJson);
+  // The toRadio endpoint uses PUT request
+  int httpResponseCode = http.PUT(radioJson);
   
   if (httpResponseCode > 0) {
     Serial.print("HTTP Response code: ");
@@ -441,13 +444,13 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
     String payload = http.getString();
     Serial.println("Response: " + payload);
     
-    if (httpResponseCode == 200) {
+    if (httpResponseCode == 200 || httpResponseCode == 204) {
       Serial.println("Message sent successfully to Meshtastic node!");
     } else {
       Serial.println("Unexpected response from Meshtastic node.");
     }
   } else {
-    Serial.print("Error on sending POST: ");
+    Serial.print("Error on sending PUT: ");
     Serial.println(httpResponseCode);
   }
   
