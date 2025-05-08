@@ -17,7 +17,7 @@ build/
 # Temporary files
 *.tmp
 *.swp
-
+/logs
 # Other IDE files
 *.suo
 *.user
