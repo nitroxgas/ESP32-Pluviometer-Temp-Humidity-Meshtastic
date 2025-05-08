@@ -11,6 +11,7 @@ Este projeto implementa uma estação meteorológica com eficiência energética
 - Múltiplas fontes de wake-up:
   - Baseado em timer (leituras programadas regulares)
   - Baseado em interrupção (detecção imediata de chuva)
+  - Botão de configuração (para entrar no modo de configuração)
 - Suporte para diferentes sensores (configuráveis em tempo de compilação):
   - DHT22 (temperatura e umidade)
   - AHT20 (temperatura e umidade de alta precisão)
@@ -18,6 +19,10 @@ Este projeto implementa uma estação meteorológica com eficiência energética
 - Monitoramento de pluviômetro (0,25mm por basculada/interrupção)
 - Conectividade WiFi para nó Meshtastic
 - Transmissão de dados em formato JSON para propagação na rede LoRa
+- Interface de configuração remota:
+  - Portal web acessível via WiFi quando no modo de configuração
+  - Configuração BLE para ajuste de parâmetros via smartphone
+  - Persistência de configurações usando LittleFS
 
 ## Requisitos de Hardware
 
@@ -49,15 +54,38 @@ Este projeto implementa uma estação meteorológica com eficiência energética
 
 ## Configuração
 
-Edite o arquivo `include/config.h` para personalizar:
+Existem duas formas de configurar o dispositivo:
+
+### 1. Via Portal Web
+
+Para acessar o portal de configuração:
+1. Pressione o botão BOOT do ESP32 para acordar o dispositivo em modo de configuração
+2. Ou, reinicie o dispositivo enquanto mantém o botão BOOT pressionado
+3. O ESP32 criará um ponto de acesso WiFi chamado `ESP32-Weather-XXXXXX`
+4. Conecte-se a esta rede usando a senha `weatherconfig`
+5. Navegue para http://192.168.4.1 em seu navegador
+6. Configure todos os parâmetros necessários na interface web
+
+### 2. Via Bluetooth Low Energy (BLE)
+
+1. Ative o modo de configuração conforme descrito acima
+2. Use um aplicativo BLE Scanner ou aplicativo específico para ESP32
+3. Conecte-se ao dispositivo `ESP32-Weather`
+4. Acesse o serviço UUID `4fafc201-1fb5-459e-8fcc-c5c9c331914b`
+5. Leia/escreva na característica UUID `beb5483e-36e1-4688-b7f5-ea07361b26a8`
+6. As configurações são enviadas/recebidas em formato JSON
+
+### 3. Edição Manual
+
+Edite o arquivo `include/config.h` antes da compilação para personalizar:
 
 - Tempo máximo de execução antes do sleep forçado (MAX_RUNTIME_MS)
-- Duração do deep sleep (DEEP_SLEEP_TIME_MINUTES)
-- Configuração da frequência da CPU (CPU_FREQ_MHZ)
+- Duração do deep sleep (DEFAULT_DEEP_SLEEP_TIME_MINUTES)
+- Configuração da frequência da CPU (DEFAULT_CPU_FREQ_MHZ)
 - Atribuições de pinos para sensores
-- Credenciais WiFi e timeout
+- Credenciais WiFi padrão (DEFAULT_WIFI_SSID, DEFAULT_WIFI_PASSWORD)
 - Endereço IP, porta e endpoint da API do nó Meshtastic
-- Calibração do pluviômetro (RAIN_MM_PER_TIP)
+- Calibração do pluviômetro (DEFAULT_RAIN_MM_PER_TIP)
 
 ## Instalação com PlatformIO
 
@@ -93,13 +121,21 @@ Observe que o código será compilado apenas com as partes relevantes para os se
     - Verifique se os resistores pull-up estão presentes nos pinos I2C (4.7kΩ recomendados)
     - Certifique-se de que apenas um sensor está conectado ao barramento I2C durante os testes iniciais
 
-- Se a conexão WiFi falhar, verifique suas credenciais e a força do sinal
+- Se a conexão WiFi falhar:
+  - Verifique suas credenciais usando o portal de configuração
+  - Verifique a força do sinal WiFi
+  - Reinicie o dispositivo e entre no modo de configuração para atualizar as credenciais
 
 - Se os dados não estiverem sendo recebidos pelo nó Meshtastic:
-  - Verifique o endereço IP do nó Meshtastic
+  - Verifique o endereço IP do nó Meshtastic usando o portal de configuração
   - Verifique se o endpoint da API está correto
   - Certifique-se de que o nó Meshtastic esteja configurado corretamente para aceitar solicitações HTTP
   
+- Problemas com o modo de configuração:
+  - Se o portal web não iniciar, pressione o botão RESET seguido do botão BOOT
+  - Se o dispositivo BLE não aparecer na lista de dispositivos, verifique se o BLE está ativado no seu smartphone
+  - Se as configurações não persistirem após reiniciar, pode haver um problema com o sistema de arquivos
+
 - Para o ambiente `i2c_sensors`:
   - Se somente um dos sensores for encontrado durante a inicialização, o código ainda funcionará com funcionalidade limitada
   - Se preferir usar apenas um sensor I2C, você pode editar o arquivo platformio.ini para remover uma das flags de compilação
