@@ -131,13 +131,18 @@ Observe que o código será compilado apenas com as partes relevantes para os se
   - Verifique o endereço IP do nó Meshtastic usando o portal de configuração
   - Confirme que o nó Meshtastic tem a API HTTP habilitada
   - O sistema usa a API `/api/v1/toradio` com método PUT para enviar mensagens
-  - As mensagens são enviadas com a estrutura correta para a API Meshtastic:
-    - id: um número aleatório para identificar a mensagem
-    - to: 0 para broadcast ou o ID do nó de destino
-    - want_ack: definido como false para nosso caso
-    - portnum: 1 (porta padrão para mensagens de texto)
-    - payload: os dados meteorológicos em formato JSON
+  - As mensagens são enviadas seguindo a estrutura ToRadio do protobuf Meshtastic:
+    - packet: objeto MeshPacket contendo:
+      - from: 0 (usa o ID do próprio nó)
+      - to: BROADCAST_ADDR (0xffffffff para broadcast)
+      - id: um número aleatório para identificar a mensagem
+      - want_ack: definido como false para nosso caso
+      - priority: "RELIABLE" para garantir melhor transmissão
+      - decoded: objeto contendo:
+        - portnum: "TEXT_MESSAGE_APP" (porta 1 para mensagens de texto)
+        - payload: os dados meteorológicos em formato JSON
   - Verifique os logs do dispositivo Meshtastic para confirmar a recepção da mensagem
+  - Se necessário, tente reiniciar o nó Meshtastic para garantir que a API HTTP esteja funcionando corretamente
   
 - Problemas com o modo de configuração:
   - Se o portal web não iniciar, pressione o botão RESET seguido do botão BOOT
