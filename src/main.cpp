@@ -22,6 +22,9 @@
 #include <Wire.h>
 #include "config.h"
 #include "ConfigManager.h"
+#include "meshtastic/mesh.pb.h"
+#include "meshtastic/portnums.pb.h"
+#include "pb_encode.h"
 
 // Sensor-specific includes and initialization
 #ifdef USE_DHT22
@@ -361,8 +364,96 @@ bool readDHT22(float &temperature, float &humidity) {
 }
 #endif
 
-// Send data to Meshtastic node using the toRadio API endpoint with correct protobuf structure
 void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
+  Serial.println("Preparing data for Meshtastic node...");
+  // Get Meshtastic configuration
+  WeatherStationConfig* config = configManager.getConfig();
+  
+  // Create JSON document for the weather data
+  StaticJsonDocument<256> dataDoc;
+  
+  // Include temperature data
+  dataDoc["temperature"] = temperature;
+  
+  // Include sensor-specific data
+  #ifdef USE_DHT22
+    dataDoc["humidity"] = humidity;
+    dataDoc["sensor"] = "DHT22";
+  #endif
+  
+  // When both I2C sensors are used, we get more complete data
+  #if defined(USE_AHT20) && defined(USE_BMP280)
+    dataDoc["humidity"] = humidity;
+    float pressure = bmp.readPressure() / 100.0F; // Convert Pa to hPa
+    dataDoc["pressure"] = pressure;
+    dataDoc["sensor"] = "AHT20+BMP280";
+  #elif defined(USE_AHT20)
+    dataDoc["humidity"] = humidity;
+    dataDoc["sensor"] = "AHT20";
+  #elif defined(USE_BMP280)
+    dataDoc["pressure"] = bmp.readPressure() / 100.0F; // Convert Pa to hPa
+    dataDoc["sensor"] = "BMP280";
+  #endif
+  
+  // Include rain data and node identification
+  dataDoc["rain"] = rainAmount;
+  dataDoc["node_name"] = config->deviceName;
+  
+  // Serialize weather data JSON to string
+  String dataString;
+  serializeJson(dataDoc, dataString);
+  
+  Serial.print("Weather data: ");
+  Serial.println(dataString);
+  
+  // Create the ToRadio message structure according to Meshtastic protobufs
+  StaticJsonDocument<1024> toRadioDoc;
+  
+  // Create a meshPacket object (this will be nested within the toRadio message)
+  JsonObject packetObj = toRadioDoc.createNestedObject("packet");
+  
+  // Fill in MeshPacket fields according to the protobuf definition
+  packetObj["from"] = 0;                                // Our device ID (0 means it should get our node number)
+  packetObj["to"] = BROADCAST_ADDR;                     // Broadcast to all nodes (BROADCAST_ADDR = 0xffffffff)
+  packetObj["id"] = random(0, 1000000);                 // Random packet ID
+  packetObj["want_ack"] = false;                        // No acknowledgment needed 
+  packetObj["priority"] = "RELIABLE";                   // Priority for the packet
+  
+  // Create the payload object within the packet
+  JsonObject payloadObj = packetObj.createNestedObject("decoded");
+  payloadObj["portnum"] = "TEXT_MESSAGE_APP";           // Use text message app (port 1)
+  payloadObj["payload"] = dataString;                   // The weather data as string payload
+  
+  // Serialize the ToRadio JSON
+  String toRadioJson;
+  serializeJson(toRadioDoc, toRadioJson);
+  
+  // Send data to Meshtastic node
+  Serial.println("Sending data to Meshtastic node...");
+  
+
+   // --- Criar payload de texto manualmente ---
+   const char* msg = serializeJson(toRadioDoc);
+  String dataString;
+  serializeJson(dataDoc, dataString);
+
+   uint8_t encodedPayload[256];
+   pb_ostream_t payloadStream = pb_ostream_from_buffer(encodedPayload, sizeof(encodedPayload));
+ 
+   // Definindo o payload como texto codificado como um simples array de bytes
+   // Estrutura do MeshPacket:
+   _meshtastic_Data pkt = meshtastic_Data_init_default;
+   pkt.dest = 0xffffffff; // broadcast
+   pkt.source = 0xffffffff;
+   pkt.bitfield = 1;
+   pkt.has_bitfield = true;
+   pkt.want_response = false;
+   pkt.portnum = meshtastic_PortNum_TEXT_MESSAGE_APP;
+   pkt.payload.size = strlen(msg);
+   memcpy(pkt.payload.bytes, msg, pkt.payload.size);
+}
+// Send data to Meshtastic node using the toRadio API endpoint with correct protobuf structure
+void sendDataToMeshtasticHTTP(float temperature, float humidity, float rainAmount) {
   Serial.println("Preparing data for Meshtastic node...");
   
   // Get Meshtastic configuration
