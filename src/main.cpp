@@ -408,27 +408,18 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   
   // ===== Usar estrutura protobuf para Meshtastic =====
   
-  // Criar um pacote MeshPacket usando a estrutura definida
-  MeshPacket meshPacket;
+  // Criamos um pacote meteorológico usando o helper de nossa biblioteca
+  // 0 = ID de nó automático (usa o ID configurado no próprio dispositivo)
+  MeshPacket meshPacket = createWeatherDataPacket(dataString, 0);
   
-  // Preencher os campos do MeshPacket conforme definição do protobuf Meshtastic
-  meshPacket.from = 0;                      // Usar nosso ID de nó (0 = próprio nó)
-  meshPacket.to = BROADCAST_ADDR;           // Destino: broadcast para todos os nós
-  meshPacket.id = random(0, 1000000);       // ID aleatório para a mensagem
-  meshPacket.want_ack = false;              // Não requer confirmação
-  meshPacket.port = TEXT_MESSAGE_APP;       // Porta para mensagens de texto (1)
-  
-  // Copiar dados (limitado ao tamanho do buffer)
-  if (dataString.length() < sizeof(meshPacket.payload.data)) {
-    strncpy(meshPacket.payload.data, dataString.c_str(), sizeof(meshPacket.payload.data) - 1);
-    meshPacket.payload.data[sizeof(meshPacket.payload.data) - 1] = '\0'; // Garantir terminação
-    meshPacket.payload.size = dataString.length();
-  } else {
-    Serial.println("AVISO: Dados muito grandes para o payload, serão truncados");
-    strncpy(meshPacket.payload.data, dataString.c_str(), sizeof(meshPacket.payload.data) - 1);
-    meshPacket.payload.data[sizeof(meshPacket.payload.data) - 1] = '\0';
-    meshPacket.payload.size = sizeof(meshPacket.payload.data) - 1;
-  }
+  // Adicionar log para debug
+  Serial.print("Criado pacote de dados meteorológicos com ID: ");
+  Serial.println(meshPacket.id);
+  Serial.print("Tamanho dos dados: ");
+  Serial.print(meshPacket.payload.size);
+  Serial.print(" bytes de ");
+  Serial.print(sizeof(meshPacket.payload.data));
+  Serial.println(" disponíveis");
   
   // Converter a estrutura MeshPacket em JSON para a API HTTP do Meshtastic
   String toRadioJson = createMeshtasticToRadioJson(meshPacket);
