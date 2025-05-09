@@ -151,7 +151,7 @@ MeshPacket createWeatherDataPacket(const String& jsonData, uint32_t nodeNum) {
   packet.to = BROADCAST_ADDR;
   packet.id = random(1, 1000000);
   packet.want_ack = false;
-  packet.port = TEXT_MESSAGE_APP;  // Usar porta específica para dados meteorológicos
+  packet.port = WEATHER_APP;  // Usar porta específica para dados meteorológicos
   packet.priority = RELIABLE; // Usar prioridade confiável
   
   // Configurar payload

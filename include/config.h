@@ -7,9 +7,20 @@
 #define DEFAULT_RAIN_MM_PER_TIP 0.25         // Rain gauge produces 0.25mm per tip/interrupt
 #define DEFAULT_WIFI_SSID "your_wifi_ssid"        // WiFi SSID
 #define DEFAULT_WIFI_PASSWORD "your_wifi_password" // WiFi password
+#define DEFAULT_DEVICE_NAME "ESP32-Weather"        // Nome do dispositivo para BLE
+
+// Configurações Meshtastic
 #define DEFAULT_MESHTASTIC_NODE_IP "192.168.1.100"  // IP address of Meshtastic node
 #define DEFAULT_MESHTASTIC_NODE_PORT 80             // Port of Meshtastic node
-#define DEFAULT_DEVICE_NAME "ESP32-Weather"        // Nome do dispositivo para BLE
+
+// Configurações MQTT
+#define DEFAULT_MQTT_SERVER "mqtt.example.com"  // Servidor MQTT
+#define DEFAULT_MQTT_PORT 1883                  // Porta do servidor MQTT
+#define DEFAULT_MQTT_USERNAME ""                // Nome de usuário MQTT (opcional)
+#define DEFAULT_MQTT_PASSWORD ""                // Senha MQTT (opcional)
+#define DEFAULT_MQTT_CLIENT_ID "esp32weather"   // ID do cliente MQTT
+#define DEFAULT_MQTT_TOPIC "weather/station1"   // Tópico para publicação
+#define DEFAULT_MQTT_UPDATE_INTERVAL 0          // Intervalo em segundos (0 = único envio)
 
 // Configurações fixas do sistema
 #define MAX_RUNTIME_MS 30000         // Maximum runtime before forced sleep (30 seconds)

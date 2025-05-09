@@ -1,6 +1,6 @@
-# ESP32 Weather Station with Meshtastic Integration
+# ESP32 Weather Station with Meshtastic and MQTT Integration
 
-Este projeto implementa uma estação meteorológica com eficiência energética usando um microcontrolador ESP32. Ele suporta múltiplos sensores de temperatura/umidade/pressão (DHT22, AHT20, BMP280) e conta as basculadas do pluviômetro, depois envia esses dados para um nó Meshtastic via WiFi para propagação pela rede LoRa.
+Este projeto implementa uma estação meteorológica com eficiência energética usando um microcontrolador ESP32. Ele suporta múltiplos sensores de temperatura/umidade/pressão (DHT22, AHT20, BMP280) e conta as basculadas do pluviômetro, depois envia esses dados para um nó Meshtastic via WiFi para propagação pela rede LoRa ou para um servidor MQTT para integração com sistemas de automação residencial ou IoT.
 
 ## Características
 
@@ -17,8 +17,10 @@ Este projeto implementa uma estação meteorológica com eficiência energética
   - AHT20 (temperatura e umidade de alta precisão)
   - BMP280 (temperatura e pressão barométrica)
 - Monitoramento de pluviômetro (0,25mm por basculada/interrupção)
-- Conectividade WiFi para nó Meshtastic
-- Transmissão de dados em formato JSON para propagação na rede LoRa
+- Conectividade WiFi com suporte para:
+  - Nó Meshtastic para propagação de dados na rede LoRa
+  - Servidor MQTT para integração com sistemas de automação e IoT
+- Transmissão de dados em formato JSON para fácil processamento
 - Interface de configuração remota:
   - Portal web acessível via WiFi quando no modo de configuração
   - Configuração BLE para ajuste de parâmetros via smartphone
@@ -86,6 +88,7 @@ Edite o arquivo `include/config.h` antes da compilação para personalizar:
 - Atribuições de pinos para sensores
 - Credenciais WiFi padrão (DEFAULT_WIFI_SSID, DEFAULT_WIFI_PASSWORD)
 - Endereço IP, porta e endpoint da API do nó Meshtastic
+- Configurações do servidor MQTT (servidor, porta, credenciais, tópico, intervalo)
 - Calibração do pluviômetro (DEFAULT_RAIN_MM_PER_TIP)
 
 ## Instalação com PlatformIO
@@ -96,8 +99,10 @@ Edite o arquivo `include/config.h` antes da compilação para personalizar:
 4. O PlatformIO detectará automaticamente o projeto.
 5. Edite as configurações em `include/config.h`.
 6. Selecione o ambiente correto na barra inferior do VSCode:
-   - `dht22` - Para usar o sensor DHT22
-   - `i2c_sensors` - Para usar os sensores AHT20 e BMP280 juntos (temperatura, umidade e pressão)
+   - `dht22` - Para usar o sensor DHT22 com Meshtastic
+   - `dht22_mqtt` - Para usar o sensor DHT22 com MQTT
+   - `i2c_sensors` - Para usar os sensores AHT20 e BMP280 juntos com Meshtastic
+   - `i2c_sensors_mqtt` - Para usar os sensores AHT20 e BMP280 juntos com MQTT
 7. Clique em "Build" e depois em "Upload" na barra inferior do VSCode.
 
 Observe que o código será compilado apenas com as partes relevantes para os sensores selecionados, reduzindo o tamanho do binário final e otimizando o uso de memória. No ambiente `i2c_sensors`, o sistema utilizará o AHT20 para leituras de temperatura e umidade, e o BMP280 para leituras de pressão barométrica, fornecendo um conjunto mais completo de dados meteorológicos.
@@ -157,6 +162,14 @@ Observe que o código será compilado apenas com as partes relevantes para os se
   - Se o portal web não iniciar, pressione o botão RESET seguido do botão BOOT
   - Se o dispositivo BLE não aparecer na lista de dispositivos, verifique se o BLE está ativado no seu smartphone
   - Se as configurações não persistirem após reiniciar, pode haver um problema com o sistema de arquivos
+
+- Problemas com MQTT:
+  - Verifique se o servidor MQTT está acessível na rede (o código verifica a conectividade)
+  - Certifique-se que as credenciais MQTT (usuário/senha) estão corretas
+  - Verifique se o tópico MQTT tem permissões adequadas para publicação
+  - Se o MQTT falhar, o sistema tentará usar o Meshtastic como fallback (se configurado)
+  - Os códigos de erro MQTT são exibidos no console serial para diagnóstico
+  - Se o intervalo de atualização MQTT estiver muito alto, considere a duração da bateria
 
 - Para o ambiente `i2c_sensors`:
   - Se somente um dos sensores for encontrado durante a inicialização, o código ainda funcionará com funcionalidade limitada

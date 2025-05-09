@@ -22,7 +22,18 @@
 #include <Wire.h>
 #include "config.h"
 #include "ConfigManager.h"
-#include "meshtastic-protobuf.h"
+
+// Inclui suporte a Meshtastic se a flag estiver definida
+#ifdef USE_MESHTASTIC
+  #include "meshtastic-protobuf.h"
+#endif
+
+// Inclui suporte a MQTT se a flag estiver definida
+#ifdef USE_MQTT
+  #include <PubSubClient.h>
+  WiFiClient wifiClient;
+  PubSubClient mqttClient(wifiClient);
+#endif
 
 // Sensor-specific includes and initialization
 #ifdef USE_DHT22
@@ -71,7 +82,13 @@ bool readAHT20(float &temperature, float &humidity);
 bool readBMP280(float &temperature, float &humidity);
 #endif
 
+#ifdef USE_MESHTASTIC
 void sendDataToMeshtastic(float temperature, float humidity, float rainAmount);
+#endif
+
+#ifdef USE_MQTT
+bool sendDataToMQTT(float temperature, float humidity, float rainAmount);
+#endif
 void printWakeupReason();
 void setupDeepSleep();
 void setCpuFrequency();
@@ -192,9 +209,26 @@ void setup() {
     return; // This will never be reached
   }
   
-  // Send data to Meshtastic node
+  // Send data via MQTT or Meshtastic based on build configuration
   if (WiFi.status() == WL_CONNECTED) {
-    sendDataToMeshtastic(temperature, humidity, rainAmount);
+    #ifdef USE_MQTT
+      // Use MQTT if enabled in build
+      if (sendDataToMQTT(temperature, humidity, rainAmount)) {
+        Serial.println("Data successfully sent via MQTT");
+      } else {
+        // Fall back to Meshtastic if MQTT fails and Meshtastic is available
+        Serial.println("MQTT failed");
+        #ifdef USE_MESHTASTIC
+          Serial.println("Falling back to Meshtastic");
+          sendDataToMeshtastic(temperature, humidity, rainAmount);
+        #else
+          Serial.println("No fallback available");
+        #endif
+      }
+    #else
+      // Use Meshtastic by default
+      sendDataToMeshtastic(temperature, humidity, rainAmount);
+    #endif
     
     // Disconnect WiFi before sleep to save power
     WiFi.disconnect(true);
@@ -362,6 +396,7 @@ bool readDHT22(float &temperature, float &humidity) {
 }
 #endif
 
+#ifdef USE_MESHTASTIC
 // Send data to Meshtastic node using the toRadio API endpoint with proper protobuf structure
 void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   Serial.println("Preparing data for Meshtastic node...");
@@ -465,8 +500,6 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
     http.setConnectTimeout(10000); // 10 segundos
     http.setTimeout(10000);        // 10 segundos para operações
     
-    // Codifica o MeshPacket
- /*                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       */
     // Iniciar a conexão e enviar a requisição
     if (http.begin(url)) {
       http.addHeader("Content-Type", "application/json");
@@ -514,6 +547,7 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
     Serial.println("Verifique o endereço IP e a porta do nó Meshtastic nas configurações");
   }
 }
+#endif // USE_MESHTASTIC
 
 // Configure deep sleep
 void setupDeepSleep() {
@@ -663,3 +697,177 @@ bool readBMP280(float &temperature, float &humidity) {
   return false;
 }
 #endif
+
+#ifdef USE_MQTT
+// Function to send data via MQTT
+bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
+  Serial.println("Preparing to send data via MQTT...");
+  
+  // Get MQTT configuration
+  WeatherStationConfig* config = configManager.getConfig();
+  
+  // Skip if server is not configured
+  if (strlen(config->mqttServer) == 0) {
+    Serial.println("MQTT server not configured, skipping");
+    return false;
+  }
+  
+  // Configure MQTT server
+  mqttClient.setServer(config->mqttServer, config->mqttPort);
+  
+  // Generate a client ID if not configured
+  String clientId = config->mqttClientId;
+  if (clientId.length() == 0) {
+    clientId = "ESP32Weather-";
+    clientId += String((uint32_t)(ESP.getEfuseMac() & 0xFFFFFF), HEX);
+    Serial.print("Generated MQTT client ID: ");
+    Serial.println(clientId);
+  }
+  
+  // Attempt to connect to MQTT broker
+  Serial.print("Connecting to MQTT broker at ");
+  Serial.print(config->mqttServer);
+  Serial.print(":");
+  Serial.println(config->mqttPort);
+  
+  // Try connecting with credentials if provided
+  bool connected = false;
+  if (strlen(config->mqttUsername) > 0) {
+    Serial.println("Connecting with credentials");
+    connected = mqttClient.connect(
+      clientId.c_str(), 
+      config->mqttUsername, 
+      config->mqttPassword
+    );
+  } else {
+    Serial.println("Connecting without credentials");
+    connected = mqttClient.connect(clientId.c_str());
+  }
+  
+  if (!connected) {
+    Serial.print("Failed to connect to MQTT broker, error code: ");
+    Serial.println(mqttClient.state());
+    return false;
+  }
+  
+  Serial.println("Connected to MQTT broker!");
+  
+  // Create JSON document for the weather data
+  StaticJsonDocument<256> dataDoc;
+  
+  // Include temperature data
+  dataDoc["temperature"] = temperature;
+  
+  // Include sensor-specific data
+  #ifdef USE_DHT22
+    dataDoc["humidity"] = humidity;
+    dataDoc["sensor"] = "DHT22";
+  #endif
+  
+  // When both I2C sensors are used, we get more complete data
+  #if defined(USE_AHT20) && defined(USE_BMP280)
+    dataDoc["humidity"] = humidity;
+    float pressure = bmp.readPressure() / 100.0F; // Convert Pa to hPa
+    dataDoc["pressure"] = pressure;
+    dataDoc["sensor"] = "AHT20+BMP280";
+  #elif defined(USE_AHT20)
+    dataDoc["humidity"] = humidity;
+    dataDoc["sensor"] = "AHT20";
+  #elif defined(USE_BMP280)
+    dataDoc["pressure"] = bmp.readPressure() / 100.0F; // Convert Pa to hPa
+    dataDoc["sensor"] = "BMP280";
+  #endif
+  
+  // Include rain data and node identification
+  dataDoc["rain"] = rainAmount;
+  dataDoc["node_name"] = config->deviceName;
+  
+  // Add timestamp with ESP32 uptime in seconds
+  dataDoc["uptime"] = millis() / 1000;
+  
+  // Serialize weather data JSON to string
+  String dataString;
+  serializeJson(dataDoc, dataString);
+  
+  // Use topic from configuration or default
+  String topic = config->mqttTopic;
+  if (topic.length() == 0) {
+    topic = "esp32/weather/";
+    topic += config->deviceName;
+  }
+  
+  Serial.print("Publishing to topic: ");
+  Serial.println(topic);
+  Serial.print("Data: ");
+  Serial.println(dataString);
+  
+  // Publish data to the MQTT topic
+  bool published = mqttClient.publish(topic.c_str(), dataString.c_str(), true);
+  
+  if (published) {
+    Serial.println("Data published successfully");
+    
+    // Check if interval updates are enabled
+    if (config->mqttUpdateInterval > 0) {
+      Serial.print("MQTT update interval is set to ");
+      Serial.print(config->mqttUpdateInterval);
+      Serial.println(" seconds");
+      Serial.println("Waiting for additional update period before sleep...");
+      
+      // Calculate maximum time to spend in update loop
+      unsigned long maxUpdateTime = min(config->mqttUpdateInterval * 1000, 
+                                       (unsigned long)(MAX_RUNTIME_MS - (millis() - startTime)));
+      
+      unsigned long updateStart = millis();
+      unsigned long lastPublish = millis();
+      
+      while (millis() - updateStart < maxUpdateTime) {
+        // Check if we need to publish again
+        if (millis() - lastPublish >= config->mqttUpdateInterval * 1000) {
+          // Read sensor data again
+          float newTemp = 0.0;
+          float newHumidity = 0.0;
+          
+          if (readSensorData(newTemp, newHumidity)) {
+            // Update only temperature and humidity
+            dataDoc["temperature"] = newTemp;
+            dataDoc["humidity"] = newHumidity;
+            dataDoc["uptime"] = millis() / 1000;
+            
+            // Serialize and publish
+            serializeJson(dataDoc, dataString);
+            Serial.print("Publishing update: ");
+            Serial.println(dataString);
+            
+            if (mqttClient.publish(topic.c_str(), dataString.c_str(), true)) {
+              Serial.println("Update published successfully");
+            } else {
+              Serial.println("Failed to publish update");
+            }
+          }
+          
+          lastPublish = millis();
+        }
+        
+        // Process MQTT messages
+        mqttClient.loop();
+        delay(100);
+        
+        // Check if runtime is getting too long
+        if (shouldEnterSleep()) {
+          Serial.println("Update loop interrupted due to maximum runtime");
+          break;
+        }
+      }
+    }
+    
+    // Disconnect MQTT client
+    mqttClient.disconnect();
+    return true;
+  } else {
+    Serial.println("Failed to publish data");
+    mqttClient.disconnect();
+    return false;
+  }
+}
+#endif // USE_MQTT

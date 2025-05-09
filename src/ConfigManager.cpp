@@ -63,7 +63,7 @@ bool ConfigManager::loadConfig() {
     return false;
   }
   
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<1024> doc;
   DeserializationError error = deserializeJson(doc, configJson);
   
   if (error) {
@@ -72,7 +72,7 @@ bool ConfigManager::loadConfig() {
     return false;
   }
   
-  // Carrega dados do JSON para a estrutura
+  // Carrega dados do JSON para a estrutura - configurações básicas
   _config.deepSleepTimeMinutes = doc["sleep"] | DEFAULT_DEEP_SLEEP_TIME_MINUTES;
   _config.cpuFreqMHz = doc["cpu"] | DEFAULT_CPU_FREQ_MHZ;
   
@@ -83,11 +83,23 @@ bool ConfigManager::loadConfig() {
     _config.rainMmPerTip = DEFAULT_RAIN_MM_PER_TIP;
   }
   
+  // WiFi e nome do dispositivo
   strlcpy(_config.wifiSsid, doc["ssid"] | DEFAULT_WIFI_SSID, sizeof(_config.wifiSsid));
   strlcpy(_config.wifiPassword, doc["pass"] | DEFAULT_WIFI_PASSWORD, sizeof(_config.wifiPassword));
+  strlcpy(_config.deviceName, doc["name"] | DEFAULT_DEVICE_NAME, sizeof(_config.deviceName));
+  
+  // Meshtastic
   strlcpy(_config.meshtasticNodeIP, doc["node_ip"] | DEFAULT_MESHTASTIC_NODE_IP, sizeof(_config.meshtasticNodeIP));
   _config.meshtasticNodePort = doc["node_port"] | DEFAULT_MESHTASTIC_NODE_PORT;
-  strlcpy(_config.deviceName, doc["name"] | DEFAULT_DEVICE_NAME, sizeof(_config.deviceName));
+  
+  // MQTT (novos campos)
+  strlcpy(_config.mqttServer, doc["mqtt_server"] | DEFAULT_MQTT_SERVER, sizeof(_config.mqttServer));
+  _config.mqttPort = doc["mqtt_port"] | DEFAULT_MQTT_PORT;
+  strlcpy(_config.mqttUsername, doc["mqtt_user"] | DEFAULT_MQTT_USERNAME, sizeof(_config.mqttUsername));
+  strlcpy(_config.mqttPassword, doc["mqtt_pass"] | DEFAULT_MQTT_PASSWORD, sizeof(_config.mqttPassword));
+  strlcpy(_config.mqttClientId, doc["mqtt_client"] | DEFAULT_MQTT_CLIENT_ID, sizeof(_config.mqttClientId));
+  strlcpy(_config.mqttTopic, doc["mqtt_topic"] | DEFAULT_MQTT_TOPIC, sizeof(_config.mqttTopic));
+  _config.mqttUpdateInterval = doc["mqtt_interval"] | DEFAULT_MQTT_UPDATE_INTERVAL;
   
   _config.configValid = true;
   return true;
@@ -95,16 +107,30 @@ bool ConfigManager::loadConfig() {
 
 // Salva configuração em arquivo
 bool ConfigManager::saveConfig() {
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<1024> doc;
   
+  // Configurações básicas
   doc["sleep"] = _config.deepSleepTimeMinutes;
   doc["cpu"] = _config.cpuFreqMHz;
   doc["rain"] = _config.rainMmPerTip;
+  doc["name"] = _config.deviceName;
+  
+  // WiFi
   doc["ssid"] = _config.wifiSsid;
   doc["pass"] = _config.wifiPassword;
+  
+  // Meshtastic
   doc["node_ip"] = _config.meshtasticNodeIP;
   doc["node_port"] = _config.meshtasticNodePort;
-  doc["name"] = _config.deviceName;
+  
+  // MQTT
+  doc["mqtt_server"] = _config.mqttServer;
+  doc["mqtt_port"] = _config.mqttPort;
+  doc["mqtt_user"] = _config.mqttUsername;
+  doc["mqtt_pass"] = _config.mqttPassword;
+  doc["mqtt_client"] = _config.mqttClientId;
+  doc["mqtt_topic"] = _config.mqttTopic;
+  doc["mqtt_interval"] = _config.mqttUpdateInterval;
   
   String configJson;
   serializeJson(doc, configJson);
@@ -118,11 +144,23 @@ void ConfigManager::resetToDefaults() {
   _config.cpuFreqMHz = DEFAULT_CPU_FREQ_MHZ;
   _config.rainMmPerTip = DEFAULT_RAIN_MM_PER_TIP;
   
+  // WiFi e configurações básicas
   strlcpy(_config.wifiSsid, DEFAULT_WIFI_SSID, sizeof(_config.wifiSsid));
   strlcpy(_config.wifiPassword, DEFAULT_WIFI_PASSWORD, sizeof(_config.wifiPassword));
+  strlcpy(_config.deviceName, DEFAULT_DEVICE_NAME, sizeof(_config.deviceName));
+  
+  // Meshtastic
   strlcpy(_config.meshtasticNodeIP, DEFAULT_MESHTASTIC_NODE_IP, sizeof(_config.meshtasticNodeIP));
   _config.meshtasticNodePort = DEFAULT_MESHTASTIC_NODE_PORT;
-  strlcpy(_config.deviceName, DEFAULT_DEVICE_NAME, sizeof(_config.deviceName));
+  
+  // MQTT
+  strlcpy(_config.mqttServer, DEFAULT_MQTT_SERVER, sizeof(_config.mqttServer));
+  _config.mqttPort = DEFAULT_MQTT_PORT;
+  strlcpy(_config.mqttUsername, DEFAULT_MQTT_USERNAME, sizeof(_config.mqttUsername));
+  strlcpy(_config.mqttPassword, DEFAULT_MQTT_PASSWORD, sizeof(_config.mqttPassword));
+  strlcpy(_config.mqttClientId, DEFAULT_MQTT_CLIENT_ID, sizeof(_config.mqttClientId));
+  strlcpy(_config.mqttTopic, DEFAULT_MQTT_TOPIC, sizeof(_config.mqttTopic));
+  _config.mqttUpdateInterval = DEFAULT_MQTT_UPDATE_INTERVAL;
   
   _config.configValid = true;
 }
@@ -151,15 +189,29 @@ void ConfigManager::startBLEServer() {
   _pCharacteristic->setCallbacks(_pCharacteristicCallbacks);
   
   // Inicializa com JSON de configuração atual
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<1024> doc;
+  // Configurações básicas
   doc["sleep"] = _config.deepSleepTimeMinutes;
   doc["cpu"] = _config.cpuFreqMHz;
   doc["rain"] = _config.rainMmPerTip;
+  doc["name"] = _config.deviceName;
+  
+  // WiFi
   doc["ssid"] = _config.wifiSsid;
   doc["pass"] = "********"; // Não envie a senha real via BLE
+  
+  // Meshtastic
   doc["node_ip"] = _config.meshtasticNodeIP;
   doc["node_port"] = _config.meshtasticNodePort;
-  doc["name"] = _config.deviceName;
+  
+  // MQTT
+  doc["mqtt_server"] = _config.mqttServer;
+  doc["mqtt_port"] = _config.mqttPort;
+  doc["mqtt_user"] = _config.mqttUsername;
+  doc["mqtt_pass"] = "********"; // Não envie a senha real via BLE
+  doc["mqtt_client"] = _config.mqttClientId;
+  doc["mqtt_topic"] = _config.mqttTopic;
+  doc["mqtt_interval"] = _config.mqttUpdateInterval;
   
   String configJson;
   serializeJson(doc, configJson);
@@ -369,7 +421,29 @@ String ConfigManager::generateConfigPage() {
   html += _config.meshtasticNodeIP;
   html += F("'><label>Porta:</label><input type='number' name='meshtasticNodePort' min='1' max='65535' value='");
   html += _config.meshtasticNodePort;
-  html += F("'></div><button type='submit'>Salvar</button></form></div></body></html>");
+  html += F("'></div>");
+  
+  // MQTT
+  html += F("<div class='s'><h3>MQTT</h3>");
+  html += F("<label>Servidor:</label><input name='mqttServer' value='");
+  html += _config.mqttServer;
+  html += F("'><label>Porta:</label><input type='number' name='mqttPort' min='1' max='65535' value='");
+  html += _config.mqttPort;
+  html += F("'><label>Usuário:</label><input name='mqttUsername' value='");
+  html += _config.mqttUsername;
+  html += F("'><label>Senha:</label><input type='password' name='mqttPassword' value='");
+  html += _config.mqttPassword;
+  html += F("'><label>Client ID:</label><input name='mqttClientId' value='");
+  html += _config.mqttClientId;
+  html += F("'><label>Tópico:</label><input name='mqttTopic' value='");
+  html += _config.mqttTopic;
+  html += F("'><label>Intervalo (s):</label><input type='number' name='mqttUpdateInterval' min='0' max='3600' value='");
+  html += _config.mqttUpdateInterval;
+  html += F("'><p style='font-size:0.8em'>Defina 0 para enviar apenas uma vez antes do deep sleep</p>");
+  html += F("</div>");
+  
+  // Botão Salvar
+  html += F("<button type='submit'>Salvar</button></form></div></body></html>");
   
   return html;
 }
@@ -439,6 +513,63 @@ void ConfigManager::handleConfigUpdate(AsyncWebServerRequest *request) {
     int nodePort = request->getParam("meshtasticNodePort", true)->value().toInt();
     if (nodePort > 0 && nodePort < 65536) {
       _config.meshtasticNodePort = nodePort;
+      needsSave = true;
+    }
+  }
+  
+  // Parâmetros MQTT
+  if (request->hasParam("mqttServer", true)) {
+    String mqttServer = request->getParam("mqttServer", true)->value();
+    if (mqttServer.length() < sizeof(_config.mqttServer)) {
+      strlcpy(_config.mqttServer, mqttServer.c_str(), sizeof(_config.mqttServer));
+      needsSave = true;
+    }
+  }
+  
+  if (request->hasParam("mqttPort", true)) {
+    int mqttPort = request->getParam("mqttPort", true)->value().toInt();
+    if (mqttPort > 0 && mqttPort < 65536) {
+      _config.mqttPort = mqttPort;
+      needsSave = true;
+    }
+  }
+  
+  if (request->hasParam("mqttUsername", true)) {
+    String mqttUsername = request->getParam("mqttUsername", true)->value();
+    if (mqttUsername.length() < sizeof(_config.mqttUsername)) {
+      strlcpy(_config.mqttUsername, mqttUsername.c_str(), sizeof(_config.mqttUsername));
+      needsSave = true;
+    }
+  }
+  
+  if (request->hasParam("mqttPassword", true)) {
+    String mqttPassword = request->getParam("mqttPassword", true)->value();
+    if (mqttPassword.length() < sizeof(_config.mqttPassword)) {
+      strlcpy(_config.mqttPassword, mqttPassword.c_str(), sizeof(_config.mqttPassword));
+      needsSave = true;
+    }
+  }
+  
+  if (request->hasParam("mqttClientId", true)) {
+    String mqttClientId = request->getParam("mqttClientId", true)->value();
+    if (mqttClientId.length() > 0 && mqttClientId.length() < sizeof(_config.mqttClientId)) {
+      strlcpy(_config.mqttClientId, mqttClientId.c_str(), sizeof(_config.mqttClientId));
+      needsSave = true;
+    }
+  }
+  
+  if (request->hasParam("mqttTopic", true)) {
+    String mqttTopic = request->getParam("mqttTopic", true)->value();
+    if (mqttTopic.length() > 0 && mqttTopic.length() < sizeof(_config.mqttTopic)) {
+      strlcpy(_config.mqttTopic, mqttTopic.c_str(), sizeof(_config.mqttTopic));
+      needsSave = true;
+    }
+  }
+  
+  if (request->hasParam("mqttUpdateInterval", true)) {
+    int mqttUpdateInterval = request->getParam("mqttUpdateInterval", true)->value().toInt();
+    if (mqttUpdateInterval >= 0 && mqttUpdateInterval <= 3600) {
+      _config.mqttUpdateInterval = mqttUpdateInterval;
       needsSave = true;
     }
   }
@@ -605,15 +736,29 @@ void ConfigManager::CharacteristicCallbacks::onRead(NimBLECharacteristic* pChara
   WeatherStationConfig* config = _configManager->getConfig();
   
   // Atualiza característica com os valores atuais
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<1024> doc;
+  // Configurações básicas
   doc["sleep"] = config->deepSleepTimeMinutes;
   doc["cpu"] = config->cpuFreqMHz;
   doc["rain"] = config->rainMmPerTip;
+  doc["name"] = config->deviceName;
+  
+  // WiFi
   doc["ssid"] = config->wifiSsid;
-  doc["pass"] = "********"; // Não envia a senha real
+  doc["pass"] = "********"; // Não envia a senha real via BLE
+  
+  // Meshtastic
   doc["node_ip"] = config->meshtasticNodeIP;
   doc["node_port"] = config->meshtasticNodePort;
-  doc["name"] = config->deviceName;
+  
+  // MQTT
+  doc["mqtt_server"] = config->mqttServer;
+  doc["mqtt_port"] = config->mqttPort;
+  doc["mqtt_user"] = config->mqttUsername;
+  doc["mqtt_pass"] = "********"; // Não envia a senha real via BLE
+  doc["mqtt_client"] = config->mqttClientId;
+  doc["mqtt_topic"] = config->mqttTopic;
+  doc["mqtt_interval"] = config->mqttUpdateInterval;
   
   String configJson;
   serializeJson(doc, configJson);

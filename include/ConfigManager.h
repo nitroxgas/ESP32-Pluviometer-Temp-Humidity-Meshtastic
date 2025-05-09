@@ -13,11 +13,25 @@ struct WeatherStationConfig {
   uint8_t deepSleepTimeMinutes;
   uint16_t cpuFreqMHz;
   float rainMmPerTip;
+  
+  // Configurações WiFi
   char wifiSsid[32];
   char wifiPassword[64];
+  char deviceName[32];
+  
+  // Configurações Meshtastic
   char meshtasticNodeIP[16];
   uint16_t meshtasticNodePort;
-  char deviceName[32];
+  
+  // Configurações MQTT
+  char mqttServer[64];
+  uint16_t mqttPort;
+  char mqttUsername[32];
+  char mqttPassword[32];
+  char mqttClientId[32];
+  char mqttTopic[64];
+  uint16_t mqttUpdateInterval;
+  
   bool configValid;
 };
 
