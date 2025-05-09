@@ -5,6 +5,11 @@
 #define DEFAULT_DEEP_SLEEP_TIME_MINUTES 5    // Deep sleep duration in minutes
 #define DEFAULT_CPU_FREQ_MHZ 160             // CPU frequency in MHz (80 or 160 for ESP32)
 #define DEFAULT_RAIN_MM_PER_TIP 0.25         // Rain gauge produces 0.25mm per tip/interrupt
+
+// Configurações para histórico de precipitação
+#define MAX_RAIN_RECORDS 288                 // Registros para 24 horas (suponha um registro a cada 5 minutos)
+#define HOUR_MILLIS 3600000UL                // Milissegundos em uma hora
+#define DAY_MILLIS 86400000UL                // Milissegundos em um dia (24 horas)
 #define DEFAULT_WIFI_SSID "your_wifi_ssid"        // WiFi SSID
 #define DEFAULT_WIFI_PASSWORD "your_wifi_password" // WiFi password
 #define DEFAULT_DEVICE_NAME "ESP32-Weather"        // Nome do dispositivo para BLE

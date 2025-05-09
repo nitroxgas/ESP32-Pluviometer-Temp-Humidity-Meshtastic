@@ -51,10 +51,20 @@
     Adafruit_BMP280 bmp;
 #endif
 
+// Estrutura para armazenar um registro de chuva
+struct RainRecord {
+  uint32_t timestamp;  // Timestamp em milissegundos desde o início (ou em segundos desde o epoch)
+  float amount;        // Quantidade de chuva em mm
+};
+
 // Define RTC variables that persist through deep sleep
 RTC_DATA_ATTR int rainCounter = 0;    // Rain counter
 RTC_DATA_ATTR bool isFirstRun = true; // Flag for first run after power-on
 RTC_DATA_ATTR bool needsConfiguration = false; // Flag to enter configuration mode
+RTC_DATA_ATTR uint32_t lastResetTime = 0;  // Último tempo em que o sistema foi resetado (em segundos)
+RTC_DATA_ATTR RainRecord rainHistory[MAX_RAIN_RECORDS]; // Histórico de registros de chuva
+RTC_DATA_ATTR int rainHistoryCount = 0;    // Número atual de registros no histórico
+RTC_DATA_ATTR float totalRainfall = 0.0;   // Total acumulado de chuva (mm)
 
 // Define wake-up sources
 #define TIMER_WAKEUP 1
@@ -69,6 +79,10 @@ unsigned long startTime; // To track how long the device has been running
 void setupWiFi();
 void setupSensors();
 bool readSensorData(float &temperature, float &humidity);
+void addRainRecord(float amount);
+float getRainLastHour();
+float getRainLast24Hours();
+void manageRainHistory();
 
 #ifdef USE_DHT22
 bool readDHT22(float &temperature, float &humidity);
@@ -189,14 +203,36 @@ void setup() {
   }
   
   // Calculate rain amount
+  float newRainAmount = 0.0;
   if (wakeupReason == EXTERNAL_WAKEUP) {
-    // If woken by interrupt, increment rain counter
+    // Se acordou por interrupção, incrementa o contador de chuva
     rainCounter++;
     Serial.println("Rain detected! Counter: " + String(rainCounter));
+    
+    // Calcula a quantidade equivalente deste registro e adiciona ao histórico
+    newRainAmount = config->rainMmPerTip;
+    addRainRecord(newRainAmount);
+    
+    // Gerencia o histórico de registros de chuva (elimina registros muito antigos)
+    manageRainHistory();
   }
   
-  // Calculate total rain amount with calibration from config
+  // Calcula quantidade total de chuva com calibração da configuração
   rainAmount = rainCounter * config->rainMmPerTip;
+  
+  // Calcula chuva na última hora e nas últimas 24 horas
+  float rainLastHour = getRainLastHour();
+  float rainLast24Hours = getRainLast24Hours();
+  
+  Serial.print("Chuva total acumulada: ");
+  Serial.print(rainAmount);
+  Serial.println(" mm");
+  Serial.print("Chuva na última hora: ");
+  Serial.print(rainLastHour);
+  Serial.println(" mm");
+  Serial.print("Chuva nas últimas 24 horas: ");
+  Serial.print(rainLast24Hours);
+  Serial.println(" mm");
   
   // Connect to WiFi
   setupWiFi();
@@ -432,6 +468,8 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   
   // Include rain data and node identification
   dataDoc["rain"] = rainAmount;
+  dataDoc["rain_1h"] = getRainLastHour();
+  dataDoc["rain_24h"] = getRainLast24Hours();
   dataDoc["node_name"] = config->deviceName;
   
   // Serialize weather data JSON to string
@@ -780,6 +818,8 @@ bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
   
   // Include rain data and node identification
   dataDoc["rain"] = rainAmount;
+  dataDoc["rain_1h"] = getRainLastHour();
+  dataDoc["rain_24h"] = getRainLast24Hours();
   dataDoc["node_name"] = config->deviceName;
   
   // Add timestamp with ESP32 uptime in seconds
@@ -829,9 +869,11 @@ bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
           float newHumidity = 0.0;
           
           if (readSensorData(newTemp, newHumidity)) {
-            // Update only temperature and humidity
+            // Update temperature, humidity and rainfall data
             dataDoc["temperature"] = newTemp;
             dataDoc["humidity"] = newHumidity;
+            dataDoc["rain_1h"] = getRainLastHour();
+            dataDoc["rain_24h"] = getRainLast24Hours();
             dataDoc["uptime"] = millis() / 1000;
             
             // Serialize and publish
@@ -871,3 +913,120 @@ bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
   }
 }
 #endif // USE_MQTT
+
+// Adiciona um novo registro de chuva ao histórico
+void addRainRecord(float amount) {
+  // Se não houver nenhuma chuva, não registre
+  if (amount <= 0) {
+    return;
+  }
+  
+  // Obter o tempo atual em segundos
+  uint32_t currentTime = millis() / 1000;
+  
+  // Evite overflow do millis() reiniciando o tempo base se necessário
+  if (lastResetTime == 0) {
+    lastResetTime = currentTime;
+  }
+  
+  // Se o buffer estiver cheio, remova o registro mais antigo
+  if (rainHistoryCount >= MAX_RAIN_RECORDS) {
+    // Desloca todos os registros uma posição para trás
+    for (int i = 0; i < rainHistoryCount - 1; i++) {
+      rainHistory[i] = rainHistory[i + 1];
+    }
+    rainHistoryCount--;
+  }
+  
+  // Adiciona o novo registro
+  rainHistory[rainHistoryCount].timestamp = currentTime;
+  rainHistory[rainHistoryCount].amount = amount;
+  rainHistoryCount++;
+  
+  // Atualiza o total de chuva
+  totalRainfall += amount;
+  
+  Serial.print("Registro de chuva adicionado: ");
+  Serial.print(amount);
+  Serial.print(" mm no timestamp ");
+  Serial.println(currentTime);
+  Serial.print("Total acumulado: ");
+  Serial.print(totalRainfall);
+  Serial.println(" mm");
+}
+
+// Calcula a quantidade de chuva na última hora
+float getRainLastHour() {
+  float rainLastHour = 0.0;
+  uint32_t currentTime = millis() / 1000;
+  uint32_t oneHourAgo = currentTime - (HOUR_MILLIS / 1000);
+  
+  Serial.print("Calculando chuva na última hora. Tempo atual: ");
+  Serial.print(currentTime);
+  Serial.print(", uma hora atrás: ");
+  Serial.println(oneHourAgo);
+  
+  for (int i = 0; i < rainHistoryCount; i++) {
+    // Se o registro for mais recente que uma hora atrás
+    if (rainHistory[i].timestamp >= oneHourAgo) {
+      rainLastHour += rainHistory[i].amount;
+    }
+  }
+  
+  Serial.print("Chuva na última hora: ");
+  Serial.print(rainLastHour);
+  Serial.println(" mm");
+  
+  return rainLastHour;
+}
+
+// Calcula a quantidade de chuva nas últimas 24 horas
+float getRainLast24Hours() {
+  float rainLast24Hours = 0.0;
+  uint32_t currentTime = millis() / 1000;
+  uint32_t oneDayAgo = currentTime - (DAY_MILLIS / 1000);
+  
+  Serial.print("Calculando chuva nas últimas 24 horas. Tempo atual: ");
+  Serial.print(currentTime);
+  Serial.print(", 24 horas atrás: ");
+  Serial.println(oneDayAgo);
+  
+  for (int i = 0; i < rainHistoryCount; i++) {
+    // Se o registro for mais recente que 24 horas atrás
+    if (rainHistory[i].timestamp >= oneDayAgo) {
+      rainLast24Hours += rainHistory[i].amount;
+    }
+  }
+  
+  Serial.print("Chuva nas últimas 24 horas: ");
+  Serial.print(rainLast24Hours);
+  Serial.println(" mm");
+  
+  return rainLast24Hours;
+}
+
+// Gerencia o histórico de registros de chuva - limpa registros muito antigos
+void manageRainHistory() {
+  uint32_t currentTime = millis() / 1000;
+  uint32_t oneDayAgo = currentTime - (DAY_MILLIS / 1000);
+  int recordsToKeep = 0;
+  
+  // Conta quantos registros são mais recentes que 24 horas
+  for (int i = 0; i < rainHistoryCount; i++) {
+    if (rainHistory[i].timestamp >= oneDayAgo) {
+      // Se encontramos um registro no intervalo, move ele para o início do array
+      if (i > recordsToKeep) {
+        rainHistory[recordsToKeep] = rainHistory[i];
+      }
+      recordsToKeep++;
+    }
+  }
+  
+  // Atualiza o contador para refletir apenas os registros mantidos
+  if (rainHistoryCount != recordsToKeep) {
+    Serial.print("Limpando histórico de chuva: ");
+    Serial.print(rainHistoryCount - recordsToKeep);
+    Serial.println(" registros antigos removidos");
+    rainHistoryCount = recordsToKeep;
+  }
+}

@@ -17,6 +17,10 @@ Este projeto implementa uma estação meteorológica com eficiência energética
   - AHT20 (temperatura e umidade de alta precisão)
   - BMP280 (temperatura e pressão barométrica)
 - Monitoramento de pluviômetro (0,25mm por basculada/interrupção)
+- Histórico de chuva inteligente:
+  - Cálculo de precipitação na última hora
+  - Cálculo de precipitação nas últimas 24 horas
+  - Armazenamento de registros em memória RTC (persistência entre ciclos de sleep)
 - Conectividade WiFi com suporte para:
   - Nó Meshtastic para propagação de dados na rede LoRa
   - Servidor MQTT para integração com sistemas de automação e IoT
@@ -174,6 +178,17 @@ Observe que o código será compilado apenas com as partes relevantes para os se
 - Para os ambientes com sensores I2C:
   - Se somente um dos sensores for encontrado durante a inicialização, o código ainda funcionará com funcionalidade limitada
   - Se preferir usar apenas um sensor I2C, você pode editar o arquivo platformio.ini para remover uma das flags de compilação
+
+- Histórico de chuva:
+  - O sistema armazena registros na memória RTC que persiste durante o deep sleep
+  - Caso ocorra uma reinicialização completa ou perda de energia, o histórico será reiniciado
+  - Os valores de precipitação na última hora e últimas 24 horas são calculados em tempo real
+  - Se a hora do sistema for reiniciada (overflow do millis()), os cálculos serão ajustados automaticamente
+  - Os registros muito antigos (>24h) são removidos periodicamente para economizar memória
+  - Os dados de chuva são transmitidos com as seguintes chaves no JSON:
+    - "rain": precipitação total desde o último reset (mm)
+    - "rain_1h": precipitação na última hora (mm)
+    - "rain_24h": precipitação nas últimas 24 horas (mm)
 
 ## Licença
 
