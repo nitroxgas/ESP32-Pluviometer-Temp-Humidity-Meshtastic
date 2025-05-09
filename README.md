@@ -101,11 +101,11 @@ Edite o arquivo `include/config.h` antes da compilação para personalizar:
 6. Selecione o ambiente correto na barra inferior do VSCode:
    - `dht22` - Para usar o sensor DHT22 com Meshtastic
    - `dht22_mqtt` - Para usar o sensor DHT22 com MQTT
-   - `i2c_sensors` - Para usar os sensores AHT20 e BMP280 juntos com Meshtastic
+   - `i2c_sensors_meshtastic` - Para usar os sensores AHT20 e BMP280 juntos com Meshtastic
    - `i2c_sensors_mqtt` - Para usar os sensores AHT20 e BMP280 juntos com MQTT
 7. Clique em "Build" e depois em "Upload" na barra inferior do VSCode.
 
-Observe que o código será compilado apenas com as partes relevantes para os sensores selecionados, reduzindo o tamanho do binário final e otimizando o uso de memória. No ambiente `i2c_sensors`, o sistema utilizará o AHT20 para leituras de temperatura e umidade, e o BMP280 para leituras de pressão barométrica, fornecendo um conjunto mais completo de dados meteorológicos.
+Observe que o código será compilado apenas com as partes relevantes para os sensores selecionados, reduzindo o tamanho do binário final e otimizando o uso de memória. Nos ambientes `i2c_sensors_meshtastic` e `i2c_sensors_mqtt`, o sistema utilizará o AHT20 para leituras de temperatura e umidade, e o BMP280 para leituras de pressão barométrica, fornecendo um conjunto mais completo de dados meteorológicos.
 
 ## Considerações sobre Consumo de Energia
 
@@ -171,7 +171,7 @@ Observe que o código será compilado apenas com as partes relevantes para os se
   - Os códigos de erro MQTT são exibidos no console serial para diagnóstico
   - Se o intervalo de atualização MQTT estiver muito alto, considere a duração da bateria
 
-- Para o ambiente `i2c_sensors`:
+- Para os ambientes com sensores I2C:
   - Se somente um dos sensores for encontrado durante a inicialização, o código ainda funcionará com funcionalidade limitada
   - Se preferir usar apenas um sensor I2C, você pode editar o arquivo platformio.ini para remover uma das flags de compilação
 
