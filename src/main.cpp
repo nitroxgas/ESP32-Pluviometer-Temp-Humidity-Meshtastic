@@ -815,7 +815,7 @@ bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
       Serial.println("Waiting for additional update period before sleep...");
       
       // Calculate maximum time to spend in update loop
-      unsigned long maxUpdateTime = min(config->mqttUpdateInterval * 1000, 
+      unsigned long maxUpdateTime = min((unsigned long)(config->mqttUpdateInterval * 1000), 
                                        (unsigned long)(MAX_RUNTIME_MS - (millis() - startTime)));
       
       unsigned long updateStart = millis();
