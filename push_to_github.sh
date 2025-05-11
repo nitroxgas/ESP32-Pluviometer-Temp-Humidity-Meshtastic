@@ -29,7 +29,12 @@ git status
 git add .
 
 # Fazer commit das mudanças
-git commit -m "Adicionado suporte para sensores AHT20 e BMP280 juntos"
+git commit -m "Melhoria no registro de timestamps para dados de chuva
+
+- Removidos campos uptime e iso_time das mensagens MQTT e Meshtastic
+- Corrigida lógica do histórico de chuva para gerenciar registros em todas as execuções
+- Adicionado recálculo de valores de chuva após sincronização NTP
+- Atualizado YAML do Home Assistant para remover sensores não utilizados"
 
 # Enviar as mudanças para o GitHub
 echo "Enviando mudanças para o GitHub..."

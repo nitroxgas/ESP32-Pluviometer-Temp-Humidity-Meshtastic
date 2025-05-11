@@ -77,13 +77,8 @@ mqtt:
       value_template: "{{ value_json.sensor }}"
       unique_id: esp32_sensor_type
       
-    # Tempo de funcionamento
-    - name: "ESP32 Uptime"
-      state_topic: "esp32/weather/ESP32-Weather"  # Mesmo tópico
-      unit_of_measurement: "s"
-      device_class: "duration"
-      value_template: "{{ value_json.uptime }}"
-      unique_id: esp32_uptime
+# Campo uptime removido do MQTT
+# Mantida apenas definição de timestamp
       
     # Timestamp (quando disponível via NTP)
     - name: "ESP32 Last Update"

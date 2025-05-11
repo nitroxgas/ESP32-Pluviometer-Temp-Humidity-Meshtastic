@@ -1,0 +1,22 @@
+# Instructions for pushing these changes to GitHub
+
+1. Add the modified files to the staging area:
+   git add src/main.cpp homeassistant_sensor_config.yaml
+
+2. Create a commit with a descriptive message:
+   git commit -m "Improve timestamp handling for rainfall data
+   
+   - Remove uptime and iso_time fields from MQTT and Meshtastic messages
+   - Fix rainfall history management to run on every execution
+   - Update rainfall calculations to use NTP timestamps when available
+   - Update Home Assistant YAML configuration to match new data structure"
+
+3. Push the changes to your GitHub repository:
+   git push
+
+# Changes Summary
+These changes improve the accuracy of rainfall reporting by:
+1. Using NTP timestamps for all rainfall records when available
+2. Recalculating rainfall totals after NTP sync
+3. Ensuring rainfall history is managed properly even when not raining
+4. Removing unnecessary fields from transmissions to save bandwidth

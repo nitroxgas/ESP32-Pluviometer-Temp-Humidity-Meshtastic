@@ -227,15 +227,17 @@ void setup() {
     // Calcula a quantidade equivalente deste registro e adiciona ao histórico
     newRainAmount = config->rainMmPerTip;
     addRainRecord(newRainAmount);
-    
-    // Gerencia o histórico de registros de chuva (elimina registros muito antigos)
-    manageRainHistory();
   }
+  
+  // Gerencia o histórico de registros de chuva (elimina registros muito antigos)
+  // Isto é feito em todas as execuções, não apenas quando chove
+  manageRainHistory();
   
   // Calcula quantidade total de chuva com calibração da configuração
   rainAmount = rainCounter * config->rainMmPerTip;
   
   // Calcula chuva na última hora e nas últimas 24 horas
+  // Estas funções agora retornam valores atualizados independentemente da causa do wakeup
   float rainLastHour = getRainLastHour();
   float rainLast24Hours = getRainLast24Hours();
   
@@ -249,7 +251,7 @@ void setup() {
   Serial.print(rainLast24Hours);
   Serial.println(" mm");
   
-  // Connect to WiFi
+  // Connect to WiFi and sync time
   setupWiFi();
   
   // Check if we should enter sleep
@@ -258,6 +260,21 @@ void setup() {
     Serial.println("Maximum runtime exceeded after WiFi connection, entering deep sleep...");
     esp_deep_sleep_start();
     return; // This will never be reached
+  }
+  
+  // Atualiza os cálculos de chuva após ter o timestamp NTP sincronizado
+  if (WiFi.status() == WL_CONNECTED) {
+    // Recalcula os valores de chuva com o timestamp atualizado
+    float rainLastHour = getRainLastHour();
+    float rainLast24Hours = getRainLast24Hours();
+    
+    Serial.println("Valores de chuva recalculados após sincronização NTP:");
+    Serial.print("Chuva na última hora: ");
+    Serial.print(rainLastHour);
+    Serial.println(" mm");
+    Serial.print("Chuva nas últimas 24 horas: ");
+    Serial.print(rainLast24Hours);
+    Serial.println(" mm");
   }
   
   // Send data via MQTT or Meshtastic based on build configuration
@@ -490,21 +507,10 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   dataDoc["rain_24h"] = getRainLast24Hours();
   dataDoc["node_name"] = config->deviceName;
   
-  // Add timestamps
-  dataDoc["uptime"] = millis() / 1000;  // ESP32 uptime em segundos
-  
-  // Adiciona timestamp NTP se disponível
+  // Adiciona apenas timestamp NTP (Unix) se disponível
   if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
     time_t currentTime = getLocalTime();
     dataDoc["timestamp"] = currentTime;  // Timestamp Unix (segundos desde 1970)
-    
-    // Formata a data e hora para um formato legível
-    struct tm timeinfo;
-    if(gmtime_r(&currentTime, &timeinfo)) {
-      char timeStr[30];
-      strftime(timeStr, sizeof(timeStr), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
-      dataDoc["iso_time"] = timeStr;  // Formato ISO 8601
-    }
   }
   
   // Add battery data
@@ -861,21 +867,10 @@ bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
   dataDoc["rain_24h"] = getRainLast24Hours();
   dataDoc["node_name"] = config->deviceName;
   
-  // Add timestamps
-  dataDoc["uptime"] = millis() / 1000;  // ESP32 uptime em segundos
-  
-  // Adiciona timestamp NTP se disponível
+  // Adiciona apenas timestamp NTP (Unix) se disponível
   if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
     time_t currentTime = getLocalTime();
     dataDoc["timestamp"] = currentTime;  // Timestamp Unix (segundos desde 1970)
-    
-    // Formata a data e hora para um formato legível
-    struct tm timeinfo;
-    if(gmtime_r(&currentTime, &timeinfo)) {
-      char timeStr[30];
-      strftime(timeStr, sizeof(timeStr), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
-      dataDoc["iso_time"] = timeStr;  // Formato ISO 8601
-    }
   }
   
   // add battery voltage
