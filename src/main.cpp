@@ -76,6 +76,8 @@ RTC_DATA_ATTR int wakeupReason = 0;
 
 // Variables for runtime management
 unsigned long startTime; // To track how long the device has been running
+float rainLastHour = 0.0;
+float rainLast24Hours = 0.0;
 
 // Define battery monitoring variables
 #define BATTERY_ADC_PIN 35  // GPIO35 (ADC1_CH7)
@@ -147,6 +149,9 @@ void setup() {
   // Get current configuration
   WeatherStationConfig* config = configManager.getConfig();
   
+  // Connect to WiFi and sync time
+  setupWiFi();
+
   // Check if device should enter config mode
   if (needsConfiguration || configManager.checkConfigButtonPressed()) {
     Serial.println("Entering configuration mode...");
@@ -238,7 +243,7 @@ void setup() {
   
   // Calcula chuva na última hora e nas últimas 24 horas
   // Estas funções agora retornam valores atualizados independentemente da causa do wakeup
-  float rainLastHour = getRainLastHour();
+  /* float rainLastHour = getRainLastHour();
   float rainLast24Hours = getRainLast24Hours();
   
   Serial.print("Chuva total acumulada: ");
@@ -249,10 +254,7 @@ void setup() {
   Serial.println(" mm");
   Serial.print("Chuva nas últimas 24 horas: ");
   Serial.print(rainLast24Hours);
-  Serial.println(" mm");
-  
-  // Connect to WiFi and sync time
-  setupWiFi();
+  Serial.println(" mm"); */
   
   // Check if we should enter sleep
   if (shouldEnterSleep()) {
@@ -265,16 +267,15 @@ void setup() {
   // Atualiza os cálculos de chuva após ter o timestamp NTP sincronizado
   if (WiFi.status() == WL_CONNECTED) {
     // Recalcula os valores de chuva com o timestamp atualizado
-    float rainLastHour = getRainLastHour();
-    float rainLast24Hours = getRainLast24Hours();
-    
-    Serial.println("Valores de chuva recalculados após sincronização NTP:");
+    rainLastHour = getRainLastHour();
+    rainLast24Hours = getRainLast24Hours();    
+    /* Serial.println("Valores de chuva recalculados após sincronização NTP:");
     Serial.print("Chuva na última hora: ");
     Serial.print(rainLastHour);
     Serial.println(" mm");
     Serial.print("Chuva nas últimas 24 horas: ");
     Serial.print(rainLast24Hours);
-    Serial.println(" mm");
+    Serial.println(" mm"); */
   }
   
   // Send data via MQTT or Meshtastic based on build configuration
@@ -839,7 +840,7 @@ bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
   StaticJsonDocument<256> dataDoc;
   
   // Include temperature data
-  dataDoc["temperature"] = temperature;
+  dataDoc["temperature"] = round(temperature * 100) / 100;;
   
   // Include sensor-specific data
   #ifdef USE_DHT22
@@ -849,9 +850,9 @@ bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
   
   // When both I2C sensors are used, we get more complete data
   #if defined(USE_AHT20) && defined(USE_BMP280)
-    dataDoc["humidity"] = humidity;
+    dataDoc["humidity"] = round(humidity * 100) / 100; 
     float pressure = bmp.readPressure() / 100.0F; // Convert Pa to hPa
-    dataDoc["pressure"] = pressure;
+    dataDoc["pressure"] = round(pressure * 100) / 100;
     dataDoc["sensor"] = "AHT20+BMP280";
   #elif defined(USE_AHT20)
     dataDoc["humidity"] = humidity;
@@ -863,8 +864,8 @@ bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
   
   // Include rain data and node identification
   dataDoc["rain"] = rainAmount;
-  dataDoc["rain_1h"] = getRainLastHour();
-  dataDoc["rain_24h"] = getRainLast24Hours();
+  dataDoc["rain_1h"] = rainLastHour;
+  dataDoc["rain_24h"] = rainLast24Hours;
   dataDoc["node_name"] = config->deviceName;
   
   // Adiciona apenas timestamp NTP (Unix) se disponível
@@ -900,7 +901,7 @@ bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
     Serial.println("Data published successfully");
     
     // Check if interval updates are enabled
-    if (config->mqttUpdateInterval > 0) {
+    /* if (config->mqttUpdateInterval > 0) {
       Serial.print("MQTT update interval is set to ");
       Serial.print(config->mqttUpdateInterval);
       Serial.println(" seconds");
@@ -922,10 +923,10 @@ bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
           
           if (readSensorData(newTemp, newHumidity)) {
             // Update temperature, humidity and rainfall data
-            dataDoc["temperature"] = newTemp;
-            dataDoc["humidity"] = newHumidity;
-            dataDoc["rain_1h"] = getRainLastHour();
-            dataDoc["rain_24h"] = getRainLast24Hours();
+            dataDoc["temperature"] = round(newTemp * 100) / 100;
+            dataDoc["humidity"] = round(newHumidity * 100) / 100;
+            dataDoc["rain_1h"] = rainLastHour;
+            dataDoc["rain_24h"] = rainLast24Hours;
             dataDoc["uptime"] = millis() / 1000;
             
             // Serialize and publish
@@ -953,7 +954,7 @@ bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
           break;
         }
       }
-    }
+    } */
     
     // Disconnect MQTT client
     mqttClient.disconnect();
@@ -1042,24 +1043,24 @@ float getRainLastHour() {
   
   time_t oneHourAgo = currentTime - (HOUR_MILLIS / 1000);
   
-  Serial.print("Calculando chuva na última hora. Tempo atual: ");
+  /* Serial.print("Calculando chuva na última hora. Tempo atual: ");
   Serial.print(currentTime);
   Serial.print(", uma hora atrás: ");
-  Serial.println(oneHourAgo);
+  Serial.println(oneHourAgo); */
   
   // Se temos NTP, vamos mostrar o horário legível
-  if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
+ /*  if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
     struct tm nowInfo, hourAgoInfo;
     if(gmtime_r(&currentTime, &nowInfo) && gmtime_r(&oneHourAgo, &hourAgoInfo)) {
       char nowStr[30], hourAgoStr[30];
       strftime(nowStr, sizeof(nowStr), "%d/%m/%Y %H:%M:%S", &nowInfo);
       strftime(hourAgoStr, sizeof(hourAgoStr), "%d/%m/%Y %H:%M:%S", &hourAgoInfo);
       Serial.print("Data/hora atual: ");
-      Serial.println(nowStr);
-      Serial.print("Uma hora atrás: ");
+      Serial.print(nowStr);
+      Serial.print("  Uma hora atrás: ");
       Serial.println(hourAgoStr);
     }
-  }
+  } */
   
   for (int i = 0; i < rainHistoryCount; i++) {
     // Se o registro for mais recente que uma hora atrás
@@ -1089,24 +1090,24 @@ float getRainLast24Hours() {
   
   time_t oneDayAgo = currentTime - (DAY_MILLIS / 1000);
   
-  Serial.print("Calculando chuva nas últimas 24 horas. Tempo atual: ");
+  /* Serial.print("Calculando chuva nas últimas 24 horas. Tempo atual: ");
   Serial.print(currentTime);
   Serial.print(", 24 horas atrás: ");
-  Serial.println(oneDayAgo);
+  Serial.println(oneDayAgo); */
   
   // Se temos NTP, vamos mostrar o horário legível
-  if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
+  /* if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
     struct tm nowInfo, dayAgoInfo;
     if(gmtime_r(&currentTime, &nowInfo) && gmtime_r(&oneDayAgo, &dayAgoInfo)) {
       char nowStr[30], dayAgoStr[30];
       strftime(nowStr, sizeof(nowStr), "%d/%m/%Y %H:%M:%S", &nowInfo);
       strftime(dayAgoStr, sizeof(dayAgoStr), "%d/%m/%Y %H:%M:%S", &dayAgoInfo);
       Serial.print("Data/hora atual: ");
-      Serial.println(nowStr);
-      Serial.print("24 horas atrás: ");
+      Serial.print(nowStr);
+      Serial.print("  24 horas atrás: ");
       Serial.println(dayAgoStr);
     }
-  }
+  } */
   
   for (int i = 0; i < rainHistoryCount; i++) {
     // Se o registro for mais recente que 24 horas atrás
