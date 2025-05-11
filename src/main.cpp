@@ -75,6 +75,11 @@ RTC_DATA_ATTR int wakeupReason = 0;
 // Variables for runtime management
 unsigned long startTime; // To track how long the device has been running
 
+// Define battery monitoring variables
+#define BATTERY_ADC_PIN 35  // GPIO35 (ADC1_CH7)
+#define ADC_ATTEN ADC_ATTEN_DB_12  // Atenuação de 11dB para leitura até ~3.6V
+#define ADC_WIDTH ADC_WIDTH_BIT_12  // Resolução de 12 bits (0-4095)
+
 // Function prototypes
 void setupWiFi();
 void setupSensors();
@@ -107,6 +112,8 @@ void printWakeupReason();
 void setupDeepSleep();
 void setCpuFrequency();
 bool shouldEnterSleep();
+float getBatteryVoltage();
+int batteryLevel(float voltage);
 
 void setup() {
   // Record the start time
@@ -120,6 +127,10 @@ void setup() {
   
   Serial.println("\n\nESP32 Weather Station Starting...");
   
+  // Set ADC resolution to battery monitoring
+  analogReadResolution(12);  // Define resolução de 12 bits
+  analogSetAttenuation(ADC_11db);  // Define atenuação
+
   // Initialize ConfigManager
   if (!configManager.begin()) {
     Serial.println("Failed to initialize ConfigManager!");
@@ -825,6 +836,10 @@ bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
   // Add timestamp with ESP32 uptime in seconds
   dataDoc["uptime"] = millis() / 1000;
   
+  // add battery voltage
+  dataDoc["voltage"] = getBatteryVoltage();
+  dataDoc["BatteryLevel"] = batteryLevel(getBatteryVoltage());
+  
   // Serialize weather data JSON to string
   String dataString;
   serializeJson(dataDoc, dataString);
@@ -1029,4 +1044,19 @@ void manageRainHistory() {
     Serial.println(" registros antigos removidos");
     rainHistoryCount = recordsToKeep;
   }
+}
+
+float getBatteryVoltage(){
+  // float voltage = analogRead(BATTERY_ADC_PIN) * (3.3 / 4095.0);
+  int raw = analogRead(BATTERY_ADC_PIN);
+  float voltage = ((float)raw / 4095.0) * 3.6 * 2.0;
+  return voltage;
+}
+
+int batteryLevel(float voltage) {
+  if (voltage >= 4.2) return 100;
+  if (voltage >= 3.95) return 75;
+  if (voltage >= 3.7) return 50;
+  if (voltage >= 3.5) return 25;
+  return 10;  // Considerado nível crítico
 }
