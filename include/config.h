@@ -27,6 +27,12 @@
 #define DEFAULT_MQTT_TOPIC "weather/station1"   // Tópico para publicação
 #define DEFAULT_MQTT_UPDATE_INTERVAL 0          // Intervalo em segundos (0 = único envio)
 
+// Configurações do NTP (Network Time Protocol)
+#define NTP_SERVER1 "pool.ntp.org"              // Servidor NTP primário
+#define NTP_SERVER2 "time.nist.gov"             // Servidor NTP secundário
+#define NTP_TIMEZONE -3                         // Fuso horário em horas (exemplo: -3 para Brasília)
+#define NTP_SYNC_INTERVAL 3600000               // Intervalo de sincronização em ms (1 hora)
+
 // Configurações fixas do sistema
 #define MAX_RUNTIME_MS 30000         // Maximum runtime before forced sleep (30 seconds)
 #define uS_TO_MIN_FACTOR 60000000ULL // Conversion factor: microseconds to minutes
@@ -59,6 +65,7 @@
 
 // Configuração do modo de configuração
 #define CONFIG_BUTTON_PIN GPIO_NUM_0  // Botão BOOT do ESP32 para entrar no modo de configuração
+#define BATTERY_ADC_PIN 35     // Pino ADC para medição de tensão da bateria
 
 // Debug configuration
 #define DEBUG_ENABLED true     // Enable/disable debug output

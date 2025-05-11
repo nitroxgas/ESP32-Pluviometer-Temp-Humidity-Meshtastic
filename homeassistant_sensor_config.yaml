@@ -1,0 +1,112 @@
+# Configuração MQTT para ESP32 Weather Station no Home Assistant
+mqtt:
+  sensor:
+    # Sensor de temperatura
+    - name: "ESP32 Temperatura"
+      state_topic: "esp32/weather/ESP32-Weather"  # Ajuste o tópico conforme configurado no dispositivo
+      unit_of_measurement: "°C"
+      device_class: "temperature"
+      value_template: "{{ value_json.temperature }}"
+      unique_id: esp32_temperature
+      device:
+        identifiers: ["ESP32_Weather_Station"]
+        name: "ESP32 Weather Station"
+        manufacturer: "ESP32"
+        model: "Weather Station"
+        sw_version: "1.0.0"
+      
+    # Sensor de umidade
+    - name: "ESP32 Umidade"
+      state_topic: "esp32/weather/ESP32-Weather"  # Mesmo tópico
+      unit_of_measurement: "%"
+      device_class: "humidity"
+      value_template: "{{ value_json.humidity }}"
+      unique_id: esp32_humidity
+      
+    # Sensor de pressão (se estiver usando BMP280)
+    - name: "ESP32 Pressão"
+      state_topic: "esp32/weather/ESP32-Weather"  # Mesmo tópico
+      unit_of_measurement: "hPa"
+      device_class: "pressure"
+      value_template: "{{ value_json.pressure }}"
+      unique_id: esp32_pressure
+      
+    # Precipitação total acumulada
+    - name: "ESP32 Precipitação Total"
+      state_topic: "esp32/weather/ESP32-Weather"  # Mesmo tópico
+      unit_of_measurement: "mm"
+      device_class: "precipitation"
+      value_template: "{{ value_json.rain }}"
+      unique_id: esp32_rain_total
+      
+    # Precipitação última hora
+    - name: "ESP32 Precipitação Última Hora"
+      state_topic: "esp32/weather/ESP32-Weather"  # Mesmo tópico
+      unit_of_measurement: "mm"
+      device_class: "precipitation"
+      value_template: "{{ value_json.rain_1h }}"
+      unique_id: esp32_rain_1h
+      
+    # Precipitação últimas 24 horas
+    - name: "ESP32 Precipitação 24 Horas"
+      state_topic: "esp32/weather/ESP32-Weather"  # Mesmo tópico
+      unit_of_measurement: "mm"
+      device_class: "precipitation"
+      value_template: "{{ value_json.rain_24h }}"
+      unique_id: esp32_rain_24h
+      
+    # Tensão da bateria
+    - name: "ESP32 Tensão Bateria"
+      state_topic: "esp32/weather/ESP32-Weather"  # Mesmo tópico
+      unit_of_measurement: "V"
+      device_class: "voltage"
+      value_template: "{{ value_json.voltage }}"
+      unique_id: esp32_battery_voltage
+      
+    # Nível da bateria em percentual
+    - name: "ESP32 Nível Bateria"
+      state_topic: "esp32/weather/ESP32-Weather"  # Mesmo tópico
+      unit_of_measurement: "%"
+      device_class: "battery"
+      value_template: "{{ value_json.BatteryLevel }}"
+      unique_id: esp32_battery_level
+      
+    # Informação do sensor utilizado
+    - name: "ESP32 Tipo Sensor"
+      state_topic: "esp32/weather/ESP32-Weather"  # Mesmo tópico
+      value_template: "{{ value_json.sensor }}"
+      unique_id: esp32_sensor_type
+      
+    # Tempo de funcionamento
+    - name: "ESP32 Uptime"
+      state_topic: "esp32/weather/ESP32-Weather"  # Mesmo tópico
+      unit_of_measurement: "s"
+      device_class: "duration"
+      value_template: "{{ value_json.uptime }}"
+      unique_id: esp32_uptime
+      
+    # Timestamp (quando disponível via NTP)
+    - name: "ESP32 Last Update"
+      state_topic: "esp32/weather/ESP32-Weather"  # Mesmo tópico
+      device_class: "timestamp"
+      value_template: >
+        {% if value_json.timestamp is defined %}
+          {{ value_json.timestamp | timestamp_local }}
+        {% else %}
+          {{ now().timestamp() | timestamp_local }}
+        {% endif %}
+      unique_id: esp32_timestamp
+
+# Configuração de dispositivo para o Home Assistant
+# Estas configurações devem ser adicionadas a cada um dos sensores acima para agrupá-los como um único dispositivo
+# Exemplo para aplicar a qualquer sensor acima:
+
+# device:
+#   identifiers: ["ESP32_Weather_Station"]
+#   name: "ESP32 Weather Station"
+#   manufacturer: "ESP32"
+#   model: "Weather Station"
+#   sw_version: "1.0.0"
+
+# Nota: Para usar esta configuração, remova os comentários e adicione este bloco 
+# dentro de cada definição de sensor acima.

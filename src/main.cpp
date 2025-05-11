@@ -20,6 +20,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
+#include <time.h>
 #include "config.h"
 #include "ConfigManager.h"
 
@@ -62,6 +63,7 @@ RTC_DATA_ATTR int rainCounter = 0;    // Rain counter
 RTC_DATA_ATTR bool isFirstRun = true; // Flag for first run after power-on
 RTC_DATA_ATTR bool needsConfiguration = false; // Flag to enter configuration mode
 RTC_DATA_ATTR uint32_t lastResetTime = 0;  // Último tempo em que o sistema foi resetado (em segundos)
+RTC_DATA_ATTR time_t lastNTPSync = 0;      // Última vez que sincronizamos com NTP (timestamp Unix)
 RTC_DATA_ATTR RainRecord rainHistory[MAX_RAIN_RECORDS]; // Histórico de registros de chuva
 RTC_DATA_ATTR int rainHistoryCount = 0;    // Número atual de registros no histórico
 RTC_DATA_ATTR float totalRainfall = 0.0;   // Total acumulado de chuva (mm)
@@ -114,6 +116,8 @@ void setCpuFrequency();
 bool shouldEnterSleep();
 float getBatteryVoltage();
 int batteryLevel(float voltage);
+void syncTimeWithNTP();
+time_t getLocalTime();
 
 void setup() {
   // Record the start time
@@ -378,6 +382,9 @@ void setupWiFi() {
     Serial.println();
     Serial.print("Connected! IP address: ");
     Serial.println(WiFi.localIP());
+    
+    // Sincronizar o relógio com NTP após conectar WiFi
+    syncTimeWithNTP();
   } else {
     Serial.println();
     Serial.println("Connection failed! Starting configuration portal...");
@@ -482,6 +489,27 @@ void sendDataToMeshtastic(float temperature, float humidity, float rainAmount) {
   dataDoc["rain_1h"] = getRainLastHour();
   dataDoc["rain_24h"] = getRainLast24Hours();
   dataDoc["node_name"] = config->deviceName;
+  
+  // Add timestamps
+  dataDoc["uptime"] = millis() / 1000;  // ESP32 uptime em segundos
+  
+  // Adiciona timestamp NTP se disponível
+  if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
+    time_t currentTime = getLocalTime();
+    dataDoc["timestamp"] = currentTime;  // Timestamp Unix (segundos desde 1970)
+    
+    // Formata a data e hora para um formato legível
+    struct tm timeinfo;
+    if(gmtime_r(&currentTime, &timeinfo)) {
+      char timeStr[30];
+      strftime(timeStr, sizeof(timeStr), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+      dataDoc["iso_time"] = timeStr;  // Formato ISO 8601
+    }
+  }
+  
+  // Add battery data
+  dataDoc["voltage"] = getBatteryVoltage();
+  dataDoc["BatteryLevel"] = batteryLevel(getBatteryVoltage());
   
   // Serialize weather data JSON to string
   String dataString;
@@ -833,8 +861,22 @@ bool sendDataToMQTT(float temperature, float humidity, float rainAmount) {
   dataDoc["rain_24h"] = getRainLast24Hours();
   dataDoc["node_name"] = config->deviceName;
   
-  // Add timestamp with ESP32 uptime in seconds
-  dataDoc["uptime"] = millis() / 1000;
+  // Add timestamps
+  dataDoc["uptime"] = millis() / 1000;  // ESP32 uptime em segundos
+  
+  // Adiciona timestamp NTP se disponível
+  if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
+    time_t currentTime = getLocalTime();
+    dataDoc["timestamp"] = currentTime;  // Timestamp Unix (segundos desde 1970)
+    
+    // Formata a data e hora para um formato legível
+    struct tm timeinfo;
+    if(gmtime_r(&currentTime, &timeinfo)) {
+      char timeStr[30];
+      strftime(timeStr, sizeof(timeStr), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+      dataDoc["iso_time"] = timeStr;  // Formato ISO 8601
+    }
+  }
   
   // add battery voltage
   dataDoc["voltage"] = getBatteryVoltage();
@@ -936,12 +978,22 @@ void addRainRecord(float amount) {
     return;
   }
   
-  // Obter o tempo atual em segundos
-  uint32_t currentTime = millis() / 1000;
-  
-  // Evite overflow do millis() reiniciando o tempo base se necessário
-  if (lastResetTime == 0) {
-    lastResetTime = currentTime;
+  // Tenta obter o timestamp UTC do NTP se possível
+  time_t currentTime;
+  if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
+    // Usar timestamp NTP se disponível
+    currentTime = getLocalTime();
+    Serial.println("Usando timestamp NTP para registro de chuva");
+  } else {
+    // Fallback para millis se NTP não disponível
+    currentTime = millis() / 1000;
+    
+    // Evite overflow do millis() reiniciando o tempo base se necessário
+    if (lastResetTime == 0) {
+      lastResetTime = currentTime;
+    }
+    
+    Serial.println("NTP não disponível, usando timestamp local relativo");
   }
   
   // Se o buffer estiver cheio, remova o registro mais antigo
@@ -965,6 +1017,17 @@ void addRainRecord(float amount) {
   Serial.print(amount);
   Serial.print(" mm no timestamp ");
   Serial.println(currentTime);
+  
+  // Se temos NTP, vamos mostrar o horário legível
+  if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
+    struct tm timeinfo;
+    if(gmtime_r(&currentTime, &timeinfo)) {
+      char timeStr[30];
+      strftime(timeStr, sizeof(timeStr), "%d/%m/%Y %H:%M:%S", &timeinfo);
+      Serial.print("Data/hora: ");
+      Serial.println(timeStr);
+    }
+  }
   Serial.print("Total acumulado: ");
   Serial.print(totalRainfall);
   Serial.println(" mm");
@@ -973,13 +1036,35 @@ void addRainRecord(float amount) {
 // Calcula a quantidade de chuva na última hora
 float getRainLastHour() {
   float rainLastHour = 0.0;
-  uint32_t currentTime = millis() / 1000;
-  uint32_t oneHourAgo = currentTime - (HOUR_MILLIS / 1000);
+  
+  // Tenta usar o timestamp NTP se disponível
+  time_t currentTime;
+  if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
+    currentTime = getLocalTime();
+  } else {
+    currentTime = millis() / 1000;
+  }
+  
+  time_t oneHourAgo = currentTime - (HOUR_MILLIS / 1000);
   
   Serial.print("Calculando chuva na última hora. Tempo atual: ");
   Serial.print(currentTime);
   Serial.print(", uma hora atrás: ");
   Serial.println(oneHourAgo);
+  
+  // Se temos NTP, vamos mostrar o horário legível
+  if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
+    struct tm nowInfo, hourAgoInfo;
+    if(gmtime_r(&currentTime, &nowInfo) && gmtime_r(&oneHourAgo, &hourAgoInfo)) {
+      char nowStr[30], hourAgoStr[30];
+      strftime(nowStr, sizeof(nowStr), "%d/%m/%Y %H:%M:%S", &nowInfo);
+      strftime(hourAgoStr, sizeof(hourAgoStr), "%d/%m/%Y %H:%M:%S", &hourAgoInfo);
+      Serial.print("Data/hora atual: ");
+      Serial.println(nowStr);
+      Serial.print("Uma hora atrás: ");
+      Serial.println(hourAgoStr);
+    }
+  }
   
   for (int i = 0; i < rainHistoryCount; i++) {
     // Se o registro for mais recente que uma hora atrás
@@ -998,13 +1083,35 @@ float getRainLastHour() {
 // Calcula a quantidade de chuva nas últimas 24 horas
 float getRainLast24Hours() {
   float rainLast24Hours = 0.0;
-  uint32_t currentTime = millis() / 1000;
-  uint32_t oneDayAgo = currentTime - (DAY_MILLIS / 1000);
+  
+  // Tenta usar o timestamp NTP se disponível
+  time_t currentTime;
+  if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
+    currentTime = getLocalTime();
+  } else {
+    currentTime = millis() / 1000;
+  }
+  
+  time_t oneDayAgo = currentTime - (DAY_MILLIS / 1000);
   
   Serial.print("Calculando chuva nas últimas 24 horas. Tempo atual: ");
   Serial.print(currentTime);
   Serial.print(", 24 horas atrás: ");
   Serial.println(oneDayAgo);
+  
+  // Se temos NTP, vamos mostrar o horário legível
+  if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
+    struct tm nowInfo, dayAgoInfo;
+    if(gmtime_r(&currentTime, &nowInfo) && gmtime_r(&oneDayAgo, &dayAgoInfo)) {
+      char nowStr[30], dayAgoStr[30];
+      strftime(nowStr, sizeof(nowStr), "%d/%m/%Y %H:%M:%S", &nowInfo);
+      strftime(dayAgoStr, sizeof(dayAgoStr), "%d/%m/%Y %H:%M:%S", &dayAgoInfo);
+      Serial.print("Data/hora atual: ");
+      Serial.println(nowStr);
+      Serial.print("24 horas atrás: ");
+      Serial.println(dayAgoStr);
+    }
+  }
   
   for (int i = 0; i < rainHistoryCount; i++) {
     // Se o registro for mais recente que 24 horas atrás
@@ -1022,9 +1129,29 @@ float getRainLast24Hours() {
 
 // Gerencia o histórico de registros de chuva - limpa registros muito antigos
 void manageRainHistory() {
-  uint32_t currentTime = millis() / 1000;
-  uint32_t oneDayAgo = currentTime - (DAY_MILLIS / 1000);
+  // Tenta usar o timestamp NTP se disponível
+  time_t currentTime;
+  if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
+    currentTime = getLocalTime();
+  } else {
+    currentTime = millis() / 1000;
+  }
+  
+  time_t oneDayAgo = currentTime - (DAY_MILLIS / 1000);
   int recordsToKeep = 0;
+  
+  Serial.println("Gerenciando histórico de chuva...");
+  
+  // Se temos NTP, vamos mostrar o horário legível
+  if (WiFi.status() == WL_CONNECTED && lastNTPSync > 0) {
+    struct tm timeinfo;
+    if(gmtime_r(&currentTime, &timeinfo)) {
+      char timeStr[30];
+      strftime(timeStr, sizeof(timeStr), "%d/%m/%Y %H:%M:%S", &timeinfo);
+      Serial.print("Data/hora atual: ");
+      Serial.println(timeStr);
+    }
+  }
   
   // Conta quantos registros são mais recentes que 24 horas
   for (int i = 0; i < rainHistoryCount; i++) {
@@ -1059,4 +1186,56 @@ int batteryLevel(float voltage) {
   if (voltage >= 3.7) return 50;
   if (voltage >= 3.5) return 25;
   return 10;  // Considerado nível crítico
+}
+
+// Sincroniza o relógio com servidores NTP
+void syncTimeWithNTP() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi não conectado, impossível sincronizar com NTP");
+    return;
+  }
+  
+  // Verificar se precisamos sincronizar
+  time_t now = time(nullptr);
+  if (lastNTPSync > 0 && now > lastNTPSync && (now - lastNTPSync < NTP_SYNC_INTERVAL / 1000)) {
+    Serial.println("Sincronização NTP recente, pulando...");
+    return;
+  }
+  
+  Serial.println("Configurando servidores NTP...");
+  configTime(NTP_TIMEZONE * 3600, 0, NTP_SERVER1, NTP_SERVER2);
+  
+  // Aguardar sincronização
+  Serial.println("Aguardando sincronização NTP...");
+  time_t startWait = millis();
+  time_t timeout = 10000; // 10 segundos de timeout
+  
+  while (time(nullptr) < 1609459200) { // 1 de janeiro de 2021 como referência
+    delay(100);
+    if (millis() - startWait > timeout) {
+      Serial.println("Timeout na sincronização NTP");
+      return;
+    }
+  }
+  
+  now = time(nullptr);
+  lastNTPSync = now;
+  
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo)) {
+    char buffer[80];
+    strftime(buffer, sizeof(buffer), "%d/%m/%Y %H:%M:%S", &timeinfo);
+    Serial.print("Horário sincronizado: ");
+    Serial.println(buffer);
+  } else {
+    Serial.println("Falha ao obter horário local");
+  }
+}
+
+// Retorna o tempo local atual em timestamp Unix
+time_t getLocalTime() {
+  if (WiFi.status() == WL_CONNECTED && (lastNTPSync == 0 || time(nullptr) - lastNTPSync >= NTP_SYNC_INTERVAL / 1000)) {
+    syncTimeWithNTP();
+  }
+  return time(nullptr);
 }

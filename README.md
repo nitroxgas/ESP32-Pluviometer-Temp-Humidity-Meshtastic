@@ -21,6 +21,14 @@ Este projeto implementa uma estação meteorológica com eficiência energética
   - Cálculo de precipitação na última hora
   - Cálculo de precipitação nas últimas 24 horas
   - Armazenamento de registros em memória RTC (persistência entre ciclos de sleep)
+- Monitoramento de bateria:
+  - Medição de tensão através do ADC
+  - Cálculo de nível de bateria em percentual
+  - Dados enviados junto com as informações meteorológicas
+- Sincronização de horário via NTP:
+  - Obtenção de timestamp real após conexão com internet
+  - Utilização de timestamp real nos registros de chuva
+  - Inclusão de timestamp nos dados MQTT e Meshtastic
 - Conectividade WiFi com suporte para:
   - Nó Meshtastic para propagação de dados na rede LoRa
   - Servidor MQTT para integração com sistemas de automação e IoT
@@ -58,6 +66,11 @@ Este projeto implementa uma estação meteorológica com eficiência energética
    - Conecte um fio ao GND
    - Conecte o outro fio ao GPIO27 (ou altere RAIN_GAUGE_INTERRUPT_PIN em config.h)
    - Use um resistor pull-up externo (10kΩ) entre GPIO27 e 3.3V
+   
+4. **Monitoramento de Bateria:**
+   - Conecte o positivo da bateria ao pino ADC (GPIO35 por padrão)
+   - Use um divisor de tensão para baterias acima de 3.6V (por exemplo, dois resistores de 100kΩ em série)
+   - O código está configurado para um divisor que reduz a tensão pela metade
 
 ## Configuração
 
@@ -189,6 +202,24 @@ Observe que o código será compilado apenas com as partes relevantes para os se
     - "rain": precipitação total desde o último reset (mm)
     - "rain_1h": precipitação na última hora (mm)
     - "rain_24h": precipitação nas últimas 24 horas (mm)
+
+- Monitoramento de bateria:
+  - A tensão é medida através do pino ADC GPIO35 (configurável em BATTERY_ADC_PIN)
+  - O sistema espera um divisor de tensão que reduz a tensão pela metade (para baterias LiPo de 3.7-4.2V)
+  - Certifique-se que o divisor não exceda a tensão máxima do ADC (3.6V)
+  - Os dados de bateria são transmitidos com as seguintes chaves no JSON:
+    - "voltage": tensão da bateria em volts
+    - "BatteryLevel": nível estimado da bateria em percentual (100%, 75%, 50%, 25%, 10%)
+
+- Sincronização NTP:
+  - O sistema tentará sincronizar o relógio com servidores NTP após a conexão WiFi bem-sucedida
+  - Se a sincronização falhar, o sistema continuará usando timestamps relativos (baseados em millis())
+  - A sincronização é tentada uma vez por ciclo de execução ou se a última sincronização ocorreu há mais de 1 hora
+  - Os timestamps NTP são usados para calcular os intervalos de chuva de forma mais precisa
+  - Os dados enviados por MQTT incluem os seguintes campos relacionados a tempo:
+    - "uptime": tempo de execução do ESP32 em segundos desde o boot
+    - "timestamp": timestamp Unix (segundos desde 1970-01-01)
+    - "iso_time": timestamp formatado em ISO 8601 (YYYY-MM-DDThh:mm:ssZ)
 
 ## Licença
 
